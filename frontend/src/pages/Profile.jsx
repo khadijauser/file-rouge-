@@ -63,7 +63,7 @@ const Profile = () => {
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-blue"
                 required
               />
             </div>
@@ -74,7 +74,7 @@ const Profile = () => {
                 type="email"
                 value={form.email}
                 onChange={handleChange}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-blue"
                 required
               />
             </div>
@@ -90,7 +90,7 @@ const Profile = () => {
             <div className="flex gap-2">
               <button
                 type="submit"
-                className="flex-1 py-2 px-4 rounded-lg bg-sky-600 text-white font-medium hover:bg-sky-700 transition-colors"
+                className="flex-1 py-2 px-4 rounded-lg bg-medical-pink text-white font-medium hover:bg-medical-blue transition-colors"
                 disabled={saving}
               >
                 {saving ? 'Saving...' : 'Save'}
@@ -134,4 +134,4 @@ const Profile = () => {
   );
 };
 
-export default Profile; 
+export default Profile;
