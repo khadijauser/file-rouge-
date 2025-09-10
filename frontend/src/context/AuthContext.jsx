@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { apiRequest, setToken, clearToken } from '../api';
+import { apiRequest, setToken, clearToken, getToken } from '../api';
 
 const AuthContext = createContext();
 
@@ -22,14 +22,14 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         const profile = await apiRequest('/users/me');
         setUser(profile);
-      } catch {
+      } catch (err) {
         setUser(null);
         clearToken();
       } finally {
         setLoading(false);
       }
     };
-    if (localStorage.getItem('medibeauty_token')) {
+    if (getToken()) {
       fetchProfile();
     } else {
       setLoading(false);
