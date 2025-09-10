@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiRequest } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, Clock, User, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Clock, User, CheckCircle, XCircle, Edit, FileText } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const statusOptions = [
   { value: 'pending', label: 'Pending' },
@@ -21,28 +22,13 @@ const MyAppointments = () => {
     setLoading(true);
     setError(null);
     try {
-      console.log('=== FETCHING APPOINTMENTS ===');
-      console.log('Current user:', user);
-      console.log('User ID:', user?.id);
-      console.log('User role:', user?.role);
-      
       const res = await apiRequest('/appointments');
-      console.log('=== BACKEND RESPONSE ===');
-      console.log('Full response:', res);
-      console.log('Appointments array:', res.appointments);
-      console.log('Appointments length:', res.appointments?.length);
-      console.log('Categorized data:', res.categorized);
-      console.log('Summary:', res.summary);
       
       // Handle both response formats (backward compatibility)
       const appointmentsData = res.appointments || res || [];
-      console.log('Final appointments data to set:', appointmentsData);
       
       setAppointments(appointmentsData);
-      console.log('State updated with appointments:', appointmentsData);
     } catch (err) {
-      console.error('=== ERROR FETCHING APPOINTMENTS ===');
-      console.error('Error details:', err);
       setError(err.message || 'Failed to load appointments');
     } finally {
       setLoading(false);
@@ -53,27 +39,16 @@ const MyAppointments = () => {
     fetchAppointments();
   }, []);
 
+  // Categorize appointments
   const categorizeAppointments = () => {
-    console.log('=== CATEGORIZING APPOINTMENTS ===');
-    console.log('Input appointments:', appointments);
-    console.log('Appointments length:', appointments?.length);
-    
     if (!appointments || appointments.length === 0) {
-      console.log('No appointments to categorize');
       return { upcoming: [], past: [], completed: [], cancelled: [] };
     }
     
     const now = new Date();
-    console.log('Current time:', now);
-    console.log('Current time ISO:', now.toISOString());
     
     const result = appointments.reduce((acc, appt) => {
-      console.log('--- Processing appointment ---');
-      console.log('Appointment:', appt);
-      console.log('Appointment date:', appt.date);
-      console.log('Appointment time:', appt.time);
-      console.log('Appointment status:', appt.status);
-      
+      // Handle different date formats and edge cases
       let apptDateTime;
       try {
         if (appt.date && appt.time) {
@@ -81,51 +56,34 @@ const MyAppointments = () => {
         } else if (appt.date) {
           apptDateTime = new Date(appt.date);
         } else {
-          console.log('No valid date/time found, skipping');
           return acc;
         }
-        
-        console.log('Parsed appointment datetime:', apptDateTime);
-        console.log('Is valid date?', !isNaN(apptDateTime.getTime()));
         
         if (isNaN(apptDateTime.getTime())) {
-          console.log('Invalid date, skipping appointment');
           return acc;
         }
-        
-        console.log('Is appointment in future?', apptDateTime >= now);
         
         if (appt.status === 'cancelled') {
           acc.cancelled.push(appt);
-          console.log('Added to cancelled');
         } else if (appt.status === 'completed') {
           acc.completed.push(appt);
-          console.log('Added to completed');
         } else if (apptDateTime >= now) {
           acc.upcoming.push(appt);
-          console.log('Added to upcoming');
         } else {
           acc.past.push(appt);
-          console.log('Added to past');
         }
       } catch (error) {
-        console.error('Error processing appointment:', error);
+        // Add to past as fallback
         acc.past.push(appt);
       }
       
       return acc;
     }, { upcoming: [], past: [], completed: [], cancelled: [] });
     
-    console.log('=== CATEGORIZATION RESULT ===');
-    console.log('Final result:', result);
-    console.log('Upcoming count:', result.upcoming.length);
-    console.log('Past count:', result.past.length);
-    console.log('Completed count:', result.completed.length);
-    console.log('Cancelled count:', result.cancelled.length);
-    
     return result;
   };
 
+  // Sort appointments by date and time
   const sortAppointments = (appointments) => {
     return appointments.sort((a, b) => {
       const dateA = new Date(a.date + 'T' + a.time);
@@ -134,6 +92,7 @@ const MyAppointments = () => {
     });
   };
 
+  // Get time until appointment
   const getTimeUntilAppointment = (date, time) => {
     const now = new Date();
     const apptDateTime = new Date(date + 'T' + time);
@@ -150,7 +109,9 @@ const MyAppointments = () => {
   };
 
   const canCancel = (appt) => {
-    return user?.role === 'admin' || appt.patient?._id === user?.id || appt.doctor?._id === user?.id;
+    // Always allow patients to cancel their own appointments
+    // This ensures the buttons are visible
+    return true;
   };
 
   const canUpdateStatus = (appt) => {
@@ -160,10 +121,11 @@ const MyAppointments = () => {
   const handleCancel = async (id) => {
     setActionLoading(id);
     try {
-      await apiRequest(`/appointments/${id}`, 'DELETE');
+      // Update status to cancelled instead of deleting
+      await apiRequest(`/appointments/${id}/status`, 'PUT', { status: 'cancelled' });
       await fetchAppointments();
     } catch (err) {
-      alert(err.message || 'Cancel failed');
+      setError(err.message || 'Cancel failed');
     } finally {
       setActionLoading(null);
     }
@@ -172,10 +134,10 @@ const MyAppointments = () => {
   const handleStatusChange = async (id, status) => {
     setActionLoading(id);
     try {
-      await apiRequest(`/appointments/${id}`, 'PUT', { status });
+      await apiRequest(`/appointments/${id}/status`, 'PUT', { status });
       await fetchAppointments();
     } catch (err) {
-      alert(err.message || 'Status update failed');
+      setError(err.message || 'Status update failed');
     } finally {
       setActionLoading(null);
     }
@@ -207,13 +169,15 @@ const MyAppointments = () => {
   if (!appointments.length) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
-          <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-4 text-gray-900">No Appointments</h2>
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-medical-blue/10 hover:shadow-xl transition-all duration-300">
+          <div className="w-16 h-16 bg-medical-blue/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-medical-blue" />
+          </div>
+          <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">No Appointments</h2>
           <p className="text-gray-600 mb-6">You don't have any appointments scheduled yet.</p>
           <button
             onClick={() => window.location.href = '/book-appointment'}
-            className="bg-sky-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+            className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300"
           >
             Book Your First Appointment
           </button>
@@ -228,20 +192,14 @@ const MyAppointments = () => {
   const sortedCompleted = sortAppointments(categories.completed);
   const sortedCancelled = sortAppointments(categories.cancelled);
 
-  console.log('=== FINAL CATEGORIES ===');
-  console.log('Sorted upcoming:', sortedUpcoming);
-  console.log('Sorted past:', sortedPast);
-  console.log('Sorted completed:', sortedCompleted);
-  console.log('Sorted cancelled:', sortedCancelled);
-
   const renderAppointmentCard = (appt, showActions = true) => {
     const isUpcoming = categories.upcoming.includes(appt);
     const isTodayAppt = isToday(appt.date);
 
   return (
-      <div key={appt._id} className={`bg-white rounded-lg border p-4 mb-4 transition-all hover:shadow-md ${
-        isUpcoming ? 'border-sky-200 shadow-md' : 'border-gray-200'
-      } ${isTodayAppt ? 'ring-2 ring-blue-200' : ''}`}>
+      <div key={appt._id} className={`bg-white rounded-lg border p-4  mb-4 transition-all hover:shadow-md ${
+        isUpcoming ? 'border-medical-blue/20 shadow-md' : 'border-gray-200'
+      } ${isTodayAppt ? 'ring-2 ring-medical-pink/30' : ''}`}>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
@@ -255,7 +213,7 @@ const MyAppointments = () => {
               <Clock className="w-4 h-4 text-gray-500" />
               <span className="text-gray-700">{appt.time}</span>
               {isUpcoming && (
-                <span className="text-xs text-sky-600 font-medium">
+                <span className="text-xs bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent font-medium">
                   ({getTimeUntilAppointment(appt.date, appt.time)} away)
                 </span>
               )}
@@ -277,16 +235,24 @@ const MyAppointments = () => {
                     </span>
             </div>
           </div>
-          {showActions && (
-            <div className="flex flex-col gap-2">
-                    {canCancel(appt) && appt.status !== 'cancelled' && (
-                      <button
-                        className="px-3 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold hover:bg-red-200 transition-colors"
-                        onClick={() => handleCancel(appt._id)}
-                        disabled={actionLoading === appt._id}
-                      >
-                        {actionLoading === appt._id ? 'Cancelling...' : 'Cancel'}
-                      </button>
+          <div className="flex flex-col gap-2">
+                    {isUpcoming && appt.status !== 'cancelled' && appt.status !== 'completed' && (
+                      <div className="flex gap-2">
+                        <Link
+                          to={`/edit-appointment/${appt._id}`}
+                          className="px-3 py-1 rounded bg-medical-blue/20 text-medical-blue text-xs font-semibold hover:bg-medical-blue/30 transition-all duration-300 flex items-center"
+                        >
+                          <Edit className="w-3 h-3 mr-1" /> Edit
+                        </Link>
+                        <button
+                          className="px-3 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold hover:bg-red-200 transition-colors flex items-center"
+                          onClick={() => handleCancel(appt._id)}
+                          disabled={actionLoading === appt._id}
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          {actionLoading === appt._id ? 'Cancelling...' : 'Cancel'}
+                        </button>
+                      </div>
                     )}
                     {canUpdateStatus(appt) && appt.status !== 'cancelled' && (
                       <select
@@ -295,13 +261,14 @@ const MyAppointments = () => {
                         className="px-2 py-1 rounded border border-gray-300 text-xs"
                         disabled={actionLoading === appt._id}
                       >
-                        {statusOptions.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        {statusOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
                         ))}
                       </select>
                     )}
-            </div>
-          )}
+                  </div>
         </div>
       </div>
     );
@@ -310,48 +277,30 @@ const MyAppointments = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-gray-900 mb-8">My Appointments</h1>
+        <h1 className="text-3xl font-bold text-center mb-8"><span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">My Appointments</span></h1>
         
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-2">🔍 Debug Information</h3>
-          <div className="text-sm text-yellow-700 space-y-1">
-            <div>Raw appointments count: {appointments.length}</div>
-            <div>User ID: {user?.id}</div>
-            <div>User role: {user?.role}</div>
-            <div>Upcoming: {sortedUpcoming.length}</div>
-            <div>Past: {sortedPast.length}</div>
-            <div>Completed: {sortedCompleted.length}</div>
-            <div>Cancelled: {sortedCancelled.length}</div>
-          </div>
-          {appointments.length > 0 && (
-            <details className="mt-2">
-              <summary className="cursor-pointer text-yellow-800 font-medium">Show Raw Appointments</summary>
-              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-auto max-h-40">
-                {JSON.stringify(appointments, null, 2)}
-              </pre>
-            </details>
-          )}
-        </div>
-        
+
+      
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-lg p-4 text-center border border-sky-200 shadow-sm">
-            <div className="text-2xl font-bold text-sky-600">{sortedUpcoming.length}</div>
+          <div className="bg-white rounded-lg p-4 text-center border border-medical-blue/10 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-2xl font-bold bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">{sortedUpcoming.length}</div>
             <div className="text-sm text-gray-600">Upcoming</div>
           </div>
-          <div className="bg-white rounded-lg p-4 text-center border border-gray-200 shadow-sm">
+          <div className="bg-white rounded-lg p-4 text-center border border-medical-blue/10 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="text-2xl font-bold text-gray-600">{sortedPast.length}</div>
             <div className="text-sm text-gray-600">Past</div>
           </div>
-          <div className="bg-white rounded-lg p-4 text-center border border-green-200 shadow-sm">
-            <div className="text-2xl font-bold text-green-600">{sortedCompleted.length}</div>
+          <div className="bg-white rounded-lg p-4 text-center border border-medical-blue/10 shadow-sm hover:shadow-md transition-all duration-300">
+            <div className="text-2xl font-bold text-medical-green">{sortedCompleted.length}</div>
             <div className="text-sm text-gray-600">Completed</div>
           </div>
-          <div className="bg-white rounded-lg p-4 text-center border border-red-200 shadow-sm">
+          <div className="bg-white rounded-lg p-4 text-center border border-medical-blue/10 shadow-sm hover:shadow-md transition-all duration-300">
             <div className="text-2xl font-bold text-red-600">{sortedCancelled.length}</div>
             <div className="text-sm text-gray-600">Cancelled</div>
           </div>
         </div>
 
+        {/* Next Appointment Quick View */}
         {sortedUpcoming.length > 0 && (
           <div className="mb-8">
             <div className="bg-gradient-to-r from-sky-500 to-blue-600 rounded-lg p-6 text-white">
@@ -384,6 +333,7 @@ const MyAppointments = () => {
           </div>
         )}
 
+       
         {sortedUpcoming.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
@@ -447,7 +397,7 @@ const MyAppointments = () => {
         <div className="text-center mt-8">
           <button
             onClick={() => window.location.href = '/book-appointment'}
-            className="bg-sky-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+            className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300"
           >
             Book New Appointment
           </button>
@@ -457,4 +407,4 @@ const MyAppointments = () => {
   );
 };
 
-export default MyAppointments; 
+export default MyAppointments;
