@@ -11,8 +11,12 @@ router.get('/', auth, appointmentController.getAppointments);
 
 router.get('/upcoming', auth, appointmentController.getUpcomingAppointments);
 
-router.put('/:id', auth, role('doctor', 'admin'), appointmentController.updateAppointmentStatus);
+router.get('/:id', auth, appointmentController.getAppointmentById);
+
+router.put('/:id/status', auth, appointmentController.updateAppointmentStatus);
+
+router.put('/:id', auth, validateAppointment, appointmentController.updateAppointment);
 
 router.delete('/:id', auth, appointmentController.deleteAppointment);
 
-module.exports = router; 
+module.exports = router;
