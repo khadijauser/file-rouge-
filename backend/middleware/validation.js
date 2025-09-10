@@ -1,17 +1,39 @@
 const validateRegistration = (req, res, next) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, phone, role } = req.body;
+  const errors = [];
   
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required' });
+  if (!name) errors.push('Name is required');
+  if (!email) errors.push('Email is required');
+  if (!password) errors.push('Password is required');
+  
+  if (name && (name.length < 2 || name.length > 50)) {
+    errors.push('Name must be between 2 and 50 characters');
   }
   
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Password must be at least 6 characters' });
+  if (password) {
+    if (password.length < 6) {
+      errors.push('Password must be at least 6 characters');
+    }
   }
   
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ message: 'Invalid email format' });
+  if (email && !emailRegex.test(email)) {
+    errors.push('Invalid email format');
+  }
+  
+  if (phone) {
+    const phoneRegex = /^\+?[0-9]{10,15}$/;
+    if (!phoneRegex.test(phone.replace(/\s|-/g, ''))) {
+      errors.push('Invalid phone number format');
+    }
+  }
+  
+  if (role && !['patient', 'doctor', 'admin'].includes(role)) {
+    errors.push('Invalid role');
+  }
+  
+  if (errors.length > 0) {
+    return res.status(400).json({ message: errors.join(', ') });
   }
   
   next();
@@ -42,4 +64,4 @@ const validateAppointment = (req, res, next) => {
 module.exports = {
   validateRegistration,
   validateAppointment
-}; 
+};
