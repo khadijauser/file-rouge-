@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -9,55 +10,98 @@ const Login = () => {
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
   const { login, error, setError } = useAuth();
   const navigate = useNavigate();
 
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.email) {
+      newErrors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email is invalid';
+    }
+    
+    if (!formData.password) {
+      newErrors.password = 'Password is required';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
-    const loggedInUser = await login(formData);
-    if (loggedInUser) {
-      switch (loggedInUser.role) {
-        case 'patient':
-          navigate('/patient-dashboard');
-          break;
-        case 'doctor':
-          navigate('/doctor-dashboard');
-          break;
-        case 'admin':
-          navigate('/admin-dashboard');
-          break;
-        default:
-          navigate('/');
+    if (isSubmitting) return;
+    
+    if (!validateForm()) {
+      toast.error('Please fix the form errors');
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      setErrors({});
+      
+      const loggedInUser = await login(formData);
+      
+      if (loggedInUser) {
+        toast.success(`Welcome back, ${loggedInUser.name}!`);
+        
+        // Redirect based on user role
+        const dashboardRoutes = {
+          'patient': '/patient-dashboard',
+          'doctor': '/doctor-dashboard',
+          'admin': '/admin-dashboard'
+        };
+        
+        navigate(dashboardRoutes[loggedInUser.role] || '/');
       }
+    } catch (err) {
+      toast.error(err.message || 'Login failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: value
     });
+    
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-t from-cyan-100 to-[#CDC0B0] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg border border-medical-blue/10">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            Sign in to your account
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-800">
+            Sign in to your <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">account</span>
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link to="/register" className="font-medium text-sky-600 hover:text-sky-500">
+            Or{" "}
+            <Link to="/register" className="font-medium text-medical-pink hover:text-medical-blue transition-colors duration-300">
               create a new account
             </Link>
           </p>
         </div>
-        <div className="bg-white p-8 rounded-xl shadow-lg">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
                 {error}
               </div>
             )}
@@ -76,9 +120,16 @@ const Login = () => {
                   required
                   value={formData.email}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  className={`block w-full pl-10 pr-3 py-3 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 placeholder-gray-500 ${
+                    errors.email 
+                      ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                      : 'border-gray-300 focus:ring-medical-pink focus:border-medical-pink'
+                  }`}
                   placeholder="Enter your email"
                 />
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                )}
               </div>
             </div>
             <div>
@@ -96,30 +147,37 @@ const Login = () => {
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+                  className={`block w-full pl-10 pr-10 py-3 bg-gray-50 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 placeholder-gray-500 ${
+                    errors.password 
+                      ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                      : 'border-gray-300 focus:ring-medical-pink focus:border-medical-pink'
+                  }`}
                   placeholder="Enter your password"
                 />
+                {errors.password && (
+                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   )}
                 </button>
               </div>
             </div>
             <button
               type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors"
+              disabled={isSubmitting}
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-medical-pink to-medical-blue hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isSubmitting ? 'Signing In...' : 'Sign In'}
             </button>
           </form>
-        </div>
       </div>
     </div>
   );
