@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Search, Filter, X } from 'lucide-react';
-import { galleryAPI } from '../api';
+import { Link } from 'react-router-dom';
+import { galleryAPI, assetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 
-const BACKEND_URL = 'http://localhost:5000';
+const getImageUrl = (path, id, which) => {
+  if (!path || typeof path !== 'string') return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg==';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
 
-const getImageUrl = (path) => {
-  if (!path) return '';
-  if (path.startsWith('/uploads/')) return BACKEND_URL + path;
+  if (id && which) return assetUrl(`/api/gallery/${id}/${which}`);
   return path;
 };
 
@@ -19,23 +20,14 @@ const Gallery = () => {
   const [galleryItems, setGalleryItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [uploadSuccess, setUploadSuccess] = useState('');
-  const [beforeFile, setBeforeFile] = useState(null);
-  const [afterFile, setAfterFile] = useState(null);
-  const [title, setTitle] = useState('');
-  const [treatmentType, setTreatmentType] = useState('');
 
   useEffect(() => {
     const fetchGalleryItems = async () => {
       try {
         setLoading(true);
         const res = await galleryAPI.getPublic();
-        console.log('Gallery items fetched:', res);
         setGalleryItems(res.galleryItems || []);
       } catch (err) {
-        console.error('Error fetching gallery items:', err);
         setError(err.message || 'Failed to load gallery items');
       } finally {
         setLoading(false);
@@ -44,41 +36,6 @@ const Gallery = () => {
     fetchGalleryItems();
   }, []);
 
-  const handleUpload = async (e) => {
-    e.preventDefault();
-    setUploading(true);
-    setUploadError('');
-    setUploadSuccess('');
-    try {
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('treatmentType', treatmentType);
-      formData.append('beforeImage', beforeFile);
-      formData.append('afterImage', afterFile);
-      const token = localStorage.getItem('medibeauty_token');
-      const res = await fetch(BACKEND_URL + '/api/gallery', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setUploadSuccess('Upload successful!');
-        setTitle('');
-        setTreatmentType('');
-        setBeforeFile(null);
-        setAfterFile(null);
-      } else {
-        setUploadError(data.message || 'Upload failed');
-      }
-    } catch (err) {
-      setUploadError('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const categories = [
     { id: 'all', name: 'All Results' },
@@ -86,89 +43,97 @@ const Gallery = () => {
     { id: 'dental', name: 'Dental Care' },
     { id: 'dermatology', name: 'Dermatology' }
   ];
+  
+  const getCategoryFromTreatmentType = (treatmentType) => {
+    if (!treatmentType) return 'all';
+    
+    if (treatmentType.startsWith('aesthetic-')) return 'aesthetic';
+    if (treatmentType.startsWith('dental-')) return 'dental';
+    if (treatmentType.startsWith('dermatology-')) return 'dermatology';
+    
+    const legacyMapping = {
+      'Botox': 'aesthetic',
+      'Dermal Fillers': 'aesthetic',
+      'Chemical Peel': 'aesthetic',
+      'Laser Treatment': 'aesthetic',
+      'Microdermabrasion': 'aesthetic',
+      'plastic surgery': 'aesthetic'
+    };
+    
+    return legacyMapping[treatmentType] || 'all';
+  };
 
-  const filteredItems = galleryItems.filter(item => {
-    const matchesCategory = selectedCategory === 'all' || item.treatmentType.toLowerCase() === selectedCategory;
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+
+  const displayItems = galleryItems || [];
+
+  const filteredItems = displayItems?.filter(item => {
+    if (!item) return false;
+    
+    const matchesCategory = selectedCategory === 'all' || 
+      getCategoryFromTreatmentType(item.treatmentType) === selectedCategory;
+    const matchesSearch = !searchTerm || 
+      (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    
     return matchesCategory && matchesSearch;
-  });
+  }) || [];
 
   return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen">
+      <div className="relative bg-cover bg-center h-[100vh]" style={{ backgroundImage: "url('https://i.pinimg.com/1200x/e3/49/0d/e3490dd1bf0fcbcfac8b3914be489103.jpg')" }}>
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent"></div>
+        <section className="relative py-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                
+                <span className="bg-gradient-to-r from-pink-300 to-blue-300 bg-clip-text text-transparent">OUR GALLERY</span>
+              </h1>
+              <p className="text-xl text-white mb-18 max-w-3xl mx-auto">
+Discover our collection of real before-and-after transformations, showcasing the remarkable results and lasting impact of our treatments.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      
+      <div className="py-20 relative bg-gradient-to-t from-stone-300 to-stone-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {user && (user.role === 'doctor' || user.role === 'admin') && (
-          <div className="mb-8 p-6 bg-gray-50 rounded-xl shadow">
-            <h2 className="text-xl font-bold mb-4">Upload Gallery Images</h2>
-            <form onSubmit={handleUpload} className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Title"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                required
-                className="border p-2 rounded"
-              />
-              <input
-                type="text"
-                placeholder="Treatment Type"
-                value={treatmentType}
-                onChange={e => setTreatmentType(e.target.value)}
-                required
-                className="border p-2 rounded"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => setBeforeFile(e.target.files[0])}
-                required
-                className="border p-2 rounded"
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={e => setAfterFile(e.target.files[0])}
-                required
-                className="border p-2 rounded"
-              />
-              <button
-                type="submit"
-                disabled={uploading}
-                className="bg-sky-600 text-white px-4 py-2 rounded hover:bg-sky-700"
-              >
-                {uploading ? 'Uploading...' : 'Upload'}
-              </button>
-              {uploadError && <div className="text-red-600">{uploadError}</div>}
-              {uploadSuccess && <div className="text-green-600">{uploadSuccess}</div>}
-            </form>
+          <div className="mb-8 p-6 backdrop-blur-md rounded-xl shadow-lg border border-white/10">
+            <h2 className="text-xl font-bold mb-4 text-white">Gallery Management</h2>
+            <p className="text-white/80 mb-4"> Manage your gallery items from the doctor dashboard.</p>
+            <Link 
+              to="/doctor-dashboard" 
+              className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300 inline-flex items-center"
+            >
+              <span className="mr-2">Go to Gallery Management</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </Link>
           </div>
         )}
-        {/* Message for patients */}
-        {user && user.role === 'patient' && (
-          <div className="mb-8 p-6 bg-yellow-50 rounded-xl shadow text-yellow-800">
-            Only doctors and admins can upload before/after images to the gallery.
-          </div>
-        )}
-        {/* Header */}
+        
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Results Gallery
+          <h1 className="text-4xl font-bold text-white mb-4">
+            Results <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">Gallery</span>
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-lg text-white/80 max-w-2xl mx-auto">
             See real results from our patients who trusted us with their transformation journey
           </p>
         </div>
-        {/* Search and Filter */}
+
         <div className="flex flex-col lg:flex-row gap-4 mb-12">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-5 h-5" />
             <input
               type="text"
               placeholder="Search treatments..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
+              className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink focus:border-medical-pink text-white placeholder-white/50"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -176,10 +141,10 @@ const Gallery = () => {
               <button
                 key={category.id}
                 onClick={() => setSelectedCategory(category.id)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
                   selectedCategory === category.id
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-sky-50 hover:text-sky-600 border border-gray-200'
+                    ? 'bg-gradient-to-r from-medical-pink to-medical-blue text-white shadow-lg shadow-medical-pink/20'
+                    : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20'
                 }`}
               >
                 {category.name}
@@ -190,59 +155,66 @@ const Gallery = () => {
 
         {loading && (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading gallery items...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medical-blue mx-auto mb-4"></div>
+            <p className="text-white/70">Loading gallery items...</p>
           </div>
         )}
         {error && (
           <div className="text-center py-12">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-400">{error}</p>
           </div>
         )}
 
         {!loading && !error && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.length > 0 ? (
               filteredItems.map((item) => (
                 <div
                   key={item._id}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all cursor-pointer"
+                  className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg overflow-hidden hover:shadow-xl hover:shadow-medical-pink/10 transition-all duration-300 cursor-pointer border border-white/10 group"
                   onClick={() => setSelectedImage(item)}
                 >
                   <div className="relative">
                     <div className="grid grid-cols-2 gap-1">
-                      <div className="relative">
+                      <div className="relative overflow-hidden">
                         <img
-                          src={getImageUrl(item.beforeImage)}
+                          src={getImageUrl(item.beforeImage, item._id, 'before')}
                           alt="Before"
-                          className="w-full h-48 object-cover"
+                          className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
                           onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/300x200/cccccc/666666?text=Before+Image';
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkJlZm9yZTwvdGV4dD48L3N2Zz4=';
                           }}
                         />
-                        <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-xs">
+                        <div className="absolute bottom-2 left-2 bg-gradient-to-r from-medical-pink to-medical-blue text-white px-2 py-1 rounded text-xs">
                           Before
                         </div>
                       </div>
-                      <div className="relative">
+                      <div className="relative overflow-hidden">
                         <img
-                          src={getImageUrl(item.afterImage)}
+                          src={getImageUrl(item.afterImage, item._id, 'after')}
                           alt="After"
-                          className="w-full h-48 object-cover"
+                          className="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
                           onError={(e) => {
-                            e.target.src = 'https://via.placeholder.com/300x200/cccccc/666666?text=After+Image';
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFmdGVyPC90ZXh0Pjwvc3ZnPg==';
                           }}
                         />
-                        <div className="absolute bottom-2 right-2 bg-sky-600 text-white px-2 py-1 rounded text-xs">
+                        <div className="absolute bottom-2 right-2 bg-gradient-to-r from-medical-blue to-medical-pink text-white px-2 py-1 rounded text-xs">
                           After
                         </div>
                       </div>
                     </div>
                   </div>
                   <div className="p-6">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{item.title}</h3>
-                    <p className="text-gray-600 mb-3">{item.description}</p>
-                    <div className="flex justify-between items-center text-sm text-gray-500">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-xl font-semibold text-white group-hover:text-medical-pink transition-colors duration-300">{item.title}</h3>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getCategoryFromTreatmentType(item.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : getCategoryFromTreatmentType(item.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
+                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(item.treatmentType))?.name || 'Other'}
+                      </span>
+                    </div>
+                    <p className="text-white/70 mb-3">{item.description}</p>
+                    <div className="flex justify-between items-center text-sm text-white/60">
                       <span>{item.doctor?.name || 'Unknown Doctor'}</span>
                       <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                     </div>
@@ -250,74 +222,79 @@ const Gallery = () => {
                 </div>
               ))
             ) : (
-              <div className="col-span-full text-center py-12">
+              <div className="col-span-full text-center py-12 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-lg">
                 <div className="max-w-md mx-auto">
-                  <div className="text-gray-400 mb-4">
+                  <div className="text-white/40 mb-4">
                     <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Gallery Items Yet</h3>
-                  <p className="text-gray-600 mb-4">
+                  <h3 className="text-lg font-medium text-white mb-2">No Gallery Items Yet</h3>
+                  <p className="text-white/70 mb-4">
                     {user && (user.role === 'doctor' || user.role === 'admin') 
                       ? 'Upload some before/after images to showcase your work.'
                       : 'Check back soon to see our treatment results and transformations.'
                     }
                   </p>
-                  {user && (user.role === 'doctor' || user.role === 'admin') && (
-                    <button
-                      onClick={() => document.querySelector('form')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="bg-sky-600 text-white px-6 py-2 rounded-lg hover:bg-sky-700 transition-colors"
-                    >
-                      Upload First Image
-                    </button>
-                  )}
                 </div>
               </div>
             )}
           </div>
         )}
 
-        {!loading && !error && filteredItems.length === 0 && (
+        {!loading && !error && filteredItems.length === 0 && galleryItems.length > 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No results found matching your criteria</p>
+            <p className="text-white/70 text-lg">No results found matching your criteria</p>
           </div>
         )}
         {selectedImage && (
-          <div className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-br from-black/90 to-medical-blue/30 backdrop-blur-md rounded-xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-y-auto border border-white/10">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">{selectedImage.title}</h3>
-                    <p className="text-gray-600">{selectedImage.description}</p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-2xl font-bold text-white">
+                        <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">{selectedImage.title}</span>
+                      </h3>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getCategoryFromTreatmentType(selectedImage.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : getCategoryFromTreatmentType(selectedImage.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
+                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(selectedImage.treatmentType))?.name || 'Other'}
+                      </span>
+                    </div>
+                    <p className="text-white/80">{selectedImage.description}</p>
                   </div>
                   <button
                     onClick={() => setSelectedImage(null)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full p-2 transition-all duration-300"
                   >
-                    <X className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
-                    <h4 className="text-lg font-semibold mb-2">Before</h4>
-                    <img 
-                      src={getImageUrl(selectedImage.beforeImage)} 
-                      alt="Before"
-                      className="w-full rounded-lg"
-                    />
+                    <h4 className="text-lg font-semibold mb-2 text-white">Before</h4>
+                    <div className="relative overflow-hidden rounded-lg group">
+                      <img 
+                        src={getImageUrl(selectedImage.beforeImage)} 
+                        alt="Before"
+                        className="w-full h-auto max-h-[65vh] rounded-lg transition-transform duration-500 group-hover:scale-105 object-contain"
+                      />
+                      
+                    </div>
                   </div>
                   <div>
-                    <h4 className="text-lg font-semibold mb-2">After</h4>
-                    <img 
-                      src={getImageUrl(selectedImage.afterImage)} 
-                      alt="After"
-                      className="w-full rounded-lg"
-                    />
+                    <h4 className="text-lg font-semibold mb-2 text-white">After</h4>
+                    <div className="relative overflow-hidden rounded-lg group">
+                      <img 
+                        src={getImageUrl(selectedImage.afterImage)} 
+                        alt="After"
+                        className="w-full h-auto max-h-[65vh] rounded-lg transition-transform duration-500 group-hover:scale-105 object-contain"
+                      />
+                     
+                    </div>
                   </div>
                 </div>
-                <div className="mt-6 flex justify-between items-center text-gray-600">
+                <div className="mt-6 flex justify-between items-center text-white/70 bg-white/5 p-3 rounded-lg">
                   <span className="font-medium">{selectedImage.doctor?.name || 'Unknown Doctor'}</span>
                   <span>{new Date(selectedImage.createdAt).toLocaleDateString()}</span>
                 </div>
@@ -325,16 +302,18 @@ const Gallery = () => {
             </div>
           </div>
         )}
-        <div className="mt-16 bg-gradient-to-r from-sky-600 to-blue-700 text-white rounded-2xl p-12 text-center">
+        
+        <div className="mt-16 bg-gradient-to-r from-medical-pink to-medical-blue text-white rounded-2xl p-12 text-center">
           <h2 className="text-3xl font-bold mb-4">
             Ready for Your Transformation?
           </h2>
           <p className="text-xl mb-8 opacity-90">
             Book a consultation and start your journey to looking and feeling your best
           </p>
-          <button className="bg-white text-sky-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+          <Link to="/book-appointment" className="inline-block bg-white text-medical-blue px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
             Schedule Consultation
-          </button>
+          </Link>
+        </div>
         </div>
       </div>
     </div>
