@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../api';
-import { Calendar, Clock, User, Phone, Mail, FileText, Star, Plus, Edit, Save, X } from 'lucide-react';
+import { Calendar, Clock, User, Mail, Phone, FileText, Plus, Edit, Save, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const PatientDashboard = () => {
@@ -11,7 +11,8 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Profile editing state
+
+  
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
@@ -20,6 +21,10 @@ const PatientDashboard = () => {
   });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
+
+
+
+
 
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -37,7 +42,6 @@ const PatientDashboard = () => {
     fetchAppointments();
   }, []);
 
-  // Update profile form when user changes
   useEffect(() => {
     setProfileForm({
       name: user?.name || '',
@@ -108,29 +112,20 @@ const PatientDashboard = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-blue-100 text-blue-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'confirmed': return 'bg-gradient-to-r from-green-100 to-green-50 text-green-800';
+      case 'pending': return 'bg-gradient-to-r from-medical-pink/20 to-medical-blue/20 text-medical-pink';
+      case 'completed': return 'bg-gradient-to-r from-blue-100 to-blue-50 text-medical-blue';
+      case 'cancelled': return 'bg-gradient-to-r from-red-100 to-red-50 text-red-800';
+      default: return 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-800';
     }
   };
 
-  const renderStars = (rating) => {
-    return [...Array(5)].map((_, i) => (
-      <Star 
-        key={i} 
-        className={`w-4 h-4 ${i < rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} 
-      />
-    ));
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8 pt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-400 to-medical-blue bg-clip-text text-transparent">
             Welcome back, {user?.name}
           </h1>
           <p className="text-gray-600 mt-2">
@@ -138,24 +133,23 @@ const PatientDashboard = () => {
           </p>
         </div>
 
-        {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Link
             to="/book-appointment"
-            className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-2 border-dashed border-sky-300 hover:border-sky-500 group"
+            className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow border-2 border-dashed border-medical-pink/30 hover:border-medical-pink hover:shadow-medical-pink/10 hover:-translate-y-1 duration-300 group"
           >
-            <div className="flex items-center justify-center w-12 h-12 bg-sky-100 rounded-lg mb-4 group-hover:bg-sky-200 transition-colors">
-              <Plus className="w-6 h-6 text-sky-600" />
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-pink-100 to-blue-100 rounded-lg mb-4 group-hover:from-pink-200 group-hover:to-blue-200 transition-all duration-300">
+              <Plus className="w-6 h-6 text-medical-pink" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Book New Appointment</h3>
             <p className="text-gray-600">Schedule your next treatment</p>
           </Link>
 
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-lg mb-4">
-              <Calendar className="w-6 h-6 text-green-600" />
+          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg hover:shadow-medical-pink/10 hover:-translate-y-1 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-green-100 to-blue-100 rounded-lg mb-4">
+              <Calendar className="w-6 h-6 text-medical-blue" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Next Appointment</h3>
+            <h3 className="text-lg font-semibold bg-gradient-to-r from-pink-400 to-medical-blue bg-clip-text text-transparent mb-2">Next Appointment</h3>
             {nextAppointment ? (
               <p className="text-gray-600">
                 {new Date(nextAppointment.date).toLocaleDateString()} at {nextAppointment.time}
@@ -165,16 +159,15 @@ const PatientDashboard = () => {
             )}
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-md">
-            <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-lg mb-4">
-              <FileText className="w-6 h-6 text-blue-600" />
+          <div className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg hover:shadow-medical-pink/10 hover:-translate-y-1 duration-300">
+            <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-r from-pink-100 to-blue-100 rounded-lg mb-4">
+              <FileText className="w-6 h-6 text-medical-pink" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Upcoming</h3>
+            <h3 className="text-lg font-semibold bg-gradient-to-r from-pink-400 to-medical-blue bg-clip-text text-transparent mb-2">Upcoming</h3>
             <p className="text-gray-600">{categorized.upcoming.length} scheduled</p>
           </div>
         </div>
 
-        {/* Loading and Error States */}
         {loading && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
@@ -188,36 +181,35 @@ const PatientDashboard = () => {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('appointments')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'appointments'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Upcoming Appointments
               </button>
               <button
                 onClick={() => setActiveTab('history')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'history'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Treatment History
               </button>
               <button
                 onClick={() => setActiveTab('profile')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'profile'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Profile
@@ -226,7 +218,6 @@ const PatientDashboard = () => {
           </div>
 
           <div className="p-6">
-            {/* Appointments Tab */}
             {activeTab === 'appointments' && (
               <div className="space-y-4">
                 {categorized.upcoming.length === 0 ? (
@@ -261,6 +252,15 @@ const PatientDashboard = () => {
                             </div>
                           </div>
                         </div>
+                        <div className="mt-4 md:mt-0">
+                          <Link 
+                            to="/my-appointments" 
+                            className="px-4 py-2 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors inline-flex items-center"
+                          >
+                            <Calendar className="w-4 h-4 mr-1" />
+                            Manage Appointment
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -268,7 +268,6 @@ const PatientDashboard = () => {
               </div>
             )}
 
-            {/* History Tab */}
             {activeTab === 'history' && (
               <div className="space-y-4">
                 {[...categorized.completed, ...categorized.past].map((appointment) => (
@@ -291,7 +290,6 @@ const PatientDashboard = () => {
               </div>
             )}
 
-            {/* Profile Tab */}
             {activeTab === 'profile' && (
               <div className="max-w-2xl">
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Personal Information</h3>
@@ -306,7 +304,7 @@ const PatientDashboard = () => {
                       value={profileForm.name}
                       name="name"
                       onChange={handleProfileChange}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink transition-all duration-300 ${
                         editingProfile ? '' : 'bg-gray-50'
                       }`}
                       readOnly={!editingProfile}
@@ -322,7 +320,7 @@ const PatientDashboard = () => {
                       value={profileForm.email}
                       name="email"
                       onChange={handleProfileChange}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink transition-all duration-300 ${
                         editingProfile ? '' : 'bg-gray-50'
                       }`}
                       readOnly={!editingProfile}
@@ -338,7 +336,7 @@ const PatientDashboard = () => {
                       value={profileForm.phone}
                       name="phone"
                       onChange={handleProfileChange}
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 ${
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink transition-all duration-300 ${
                         editingProfile ? '' : 'bg-gray-50'
                       }`}
                       readOnly={!editingProfile}
@@ -357,7 +355,7 @@ const PatientDashboard = () => {
                         </button>
                         <button
                           onClick={handleProfileSave}
-                          className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center"
+                          className="px-4 py-2 bg-gradient-to-r from-medical-pink to-medical-blue text-white rounded-lg hover:shadow-lg hover:shadow-medical-pink/20 hover:-translate-y-0.5 transition-all duration-300 flex items-center"
                           disabled={profileSaving}
                         >
                           {profileSaving ? 'Saving...' : (
@@ -371,7 +369,7 @@ const PatientDashboard = () => {
                     ) : (
                       <button
                         onClick={handleProfileEdit}
-                        className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center"
+                        className="px-4 py-2 bg-gradient-to-r from-medical-pink to-medical-blue text-white rounded-lg hover:shadow-lg hover:shadow-medical-pink/20 hover:-translate-y-0.5 transition-all duration-300 flex items-center"
                       >
                         <Edit className="w-4 h-4 mr-1" />
                         Edit Profile
