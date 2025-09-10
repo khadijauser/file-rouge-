@@ -1,12 +1,11 @@
 const Appointment = require('../models/Appointment');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 exports.bookAppointment = async (req, res) => {
   try {
     const { doctor, date, time } = req.body;
     const patient = req.user.id;
-
-    console.log('Booking appointment:', { doctor, date, time, patient });
 
     if (!doctor || !date || !time) {
       return res.status(400).json({ message: 'Doctor, date, and time are required' });
@@ -21,6 +20,17 @@ exports.bookAppointment = async (req, res) => {
     if (!patientUser) {
       return res.status(400).json({ message: 'Invalid patient' });
     }
+    const appointmentDate = new Date(date);
+    const appointmentDateTime = new Date(`${date}T${time}`);
+    const now = new Date();
+    
+    if (isNaN(appointmentDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+    
+    if (appointmentDateTime < now) {
+      return res.status(400).json({ message: 'Cannot book appointments in the past' });
+    }
 
     const appointment = new Appointment({
       patient,
@@ -31,7 +41,6 @@ exports.bookAppointment = async (req, res) => {
     });
 
     await appointment.save();
-    console.log('Appointment saved successfully:', appointment._id);
 
     const populatedAppointment = await Appointment.findById(appointment._id)
       .populate('patient', 'name email')
@@ -42,65 +51,59 @@ exports.bookAppointment = async (req, res) => {
       appointment: populatedAppointment 
     });
   } catch (err) {
-    console.error('Error booking appointment:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
 
 exports.getAppointments = async (req, res) => {
   try {
-    console.log('=== GET APPOINTMENTS CALLED ===');
-    console.log('Request user:', req.user);
-    console.log('User ID:', req.user?.id);
-    console.log('User role:', req.user?.role);
-    
     let appointments;
     
     if (req.user.role === 'admin') {
-      console.log('Admin user - fetching all appointments');
       appointments = await Appointment.find().populate('patient doctor', 'name email role');
     } else if (req.user.role === 'doctor') {
-      console.log('Doctor user - fetching appointments for doctor ID:', req.user.id);
       appointments = await Appointment.find({ doctor: req.user.id }).populate('patient doctor', 'name email role');
     } else {
-      console.log('Patient user - fetching appointments for patient ID:', req.user.id);
       appointments = await Appointment.find({ patient: req.user.id }).populate('patient doctor', 'name email role');
     }
     
-    console.log('=== DATABASE QUERY RESULTS ===');
-    console.log('Found appointments in DB:', appointments.length);
-    console.log('Appointments:', appointments);
-    
-    if (appointments.length > 0) {
-      console.log('First appointment structure:', {
-        id: appointments[0]._id,
-        patient: appointments[0].patient,
-        doctor: appointments[0].doctor,
-        date: appointments[0].date,
-        time: appointments[0].time,
-        status: appointments[0].status
-      });
-    }
-    
     const now = new Date();
-    console.log('Current time for categorization:', now);
+    const pastPendingAppointments = [];
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     const categorized = appointments.reduce((acc, appt) => {
       const apptDateTime = new Date(appt.date + 'T' + appt.time);
-      console.log(`Appointment ${appt._id}: ${appt.date} ${appt.time} -> ${apptDateTime} (future: ${apptDateTime >= now})`);
       
       if (appt.status === 'cancelled') {
-        acc.cancelled.push(appt);
+        const updatedAt = new Date(appt.updatedAt);
+        if (updatedAt >= thirtyDaysAgo) {
+          acc.cancelled.push(appt);
+        }
       } else if (appt.status === 'completed') {
         acc.completed.push(appt);
       } else if (apptDateTime >= now) {
         acc.upcoming.push(appt);
       } else {
-        acc.past.push(appt);
+        // If appt is in the past and still pending/confirmed, mark for auto-update
+        if (appt.status === 'pending' || appt.status === 'confirmed') {
+          pastPendingAppointments.push(appt._id);
+          appt.status = 'completed';
+          acc.completed.push(appt);
+        } else {
+          acc.past.push(appt);
+        }
       }
       
       return acc;
     }, { upcoming: [], past: [], completed: [], cancelled: [] });
+    
+    if (pastPendingAppointments.length > 0) {
+      await Appointment.updateMany(
+        { _id: { $in: pastPendingAppointments } },
+        { $set: { status: 'completed' } }
+      );
+    }
 
     const response = { 
       appointments,
@@ -114,14 +117,8 @@ exports.getAppointments = async (req, res) => {
       }
     };
     
-    console.log('=== SENDING RESPONSE ===');
-    console.log('Response structure:', response);
-    console.log('Appointments count in response:', response.appointments.length);
-    
     res.json(response);
   } catch (err) {
-    console.error('=== ERROR IN GET APPOINTMENTS ===');
-    console.error('Error details:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 };
@@ -149,7 +146,6 @@ exports.getUpcomingAppointments = async (req, res) => {
         .populate('patient doctor', 'name email role')
         .sort({ date: 1, time: 1 });
     }
-
     const now = new Date();
     const upcoming = appointments.filter(appt => {
       const apptDateTime = new Date(appt.date + 'T' + appt.time);
@@ -157,6 +153,29 @@ exports.getUpcomingAppointments = async (req, res) => {
     });
 
     res.json({ upcoming, count: upcoming.length });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.getAppointmentById = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate('patient doctor', 'name email role');
+    
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+    
+    if (
+      req.user.role !== 'admin' &&
+      appointment.patient._id.toString() !== req.user.id &&
+      appointment.doctor._id.toString() !== req.user.id
+    ) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    res.json({ appointment });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -171,10 +190,89 @@ exports.updateAppointmentStatus = async (req, res) => {
       return res.status(404).json({ message: 'Appointment not found' });
     }
     
+    if (
+      req.user.role !== 'admin' &&
+      appointment.patient.toString() !== req.user.id &&
+      appointment.doctor.toString() !== req.user.id
+    ) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
     appointment.status = status;
+    
+    // important for the 30d visibil rule
+    if (status === 'cancelled') {
+      appointment.updatedAt = new Date();
+    }
+    
     await appointment.save();
     
     res.json({ message: 'Appointment status updated', appointment });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.updateAppointment = async (req, res) => {
+  try {
+    const { doctor, date, time, notes } = req.body;
+    
+    if (!doctor || !date || !time) {
+      return res.status(400).json({ message: 'Doctor, date, and time are required' });
+    }
+    
+    const appointment = await Appointment.findById(req.params.id);
+    
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+    
+    if (appointment.patient && req.user && req.user.id && 
+        appointment.patient.toString() !== req.user.id.toString() && 
+        req.user.role !== 'admin') {
+      console.log('Permission denied:', { 
+        appointmentPatient: appointment.patient ? appointment.patient.toString() : 'undefined', 
+        requestUserId: req.user.id ? req.user.id.toString() : 'undefined',
+        userRole: req.user.role 
+      });
+      return res.status(403).json({ message: 'Access denied: You can only update your own appointments' });
+    }
+    
+    if (appointment.status === 'completed' || appointment.status === 'cancelled') {
+      return res.status(400).json({ message: `Cannot update a ${appointment.status} appointment` });
+    }
+    
+    const appointmentDate = new Date(date);
+    const appointmentDateTime = new Date(`${date}T${time}`);
+    const now = new Date();
+    
+    if (isNaN(appointmentDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+    
+    if (appointmentDateTime < now) {
+      return res.status(400).json({ message: 'Cannot book appointments in the past' });
+    }
+    
+    const doctorUser = await User.findById(doctor);
+    if (!doctorUser || doctorUser.role !== 'doctor') {
+      return res.status(400).json({ message: 'Invalid doctor' });
+    }
+    
+    appointment.doctor = doctor;
+    appointment.date = date;
+    appointment.time = time;
+    appointment.notes = notes || '';
+    
+    await appointment.save();
+    
+    const populatedAppointment = await Appointment.findById(appointment._id)
+      .populate('patient doctor', 'name email');
+    
+    res.json({ 
+      message: 'Appointment updated successfully', 
+      appointment: populatedAppointment 
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -201,4 +299,4 @@ exports.deleteAppointment = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
-}; 
+};
