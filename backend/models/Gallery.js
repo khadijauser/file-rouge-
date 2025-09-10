@@ -7,7 +7,6 @@ const gallerySchema = new mongoose.Schema({
   afterImage: { type: String, required: true }, 
   treatmentType: { type: String, required: true },
   doctor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  patientConsent: { type: Boolean, default: false },
   isPublic: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -18,4 +17,4 @@ gallerySchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Gallery', gallerySchema); 
+module.exports = mongoose.model('Gallery', gallerySchema);
