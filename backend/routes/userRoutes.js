@@ -21,6 +21,8 @@ router.get('/patients', auth, userController.listPatients);
 
 router.get('/', auth, role('admin'), userController.listUsers);
 
+router.put('/:id', auth, role('admin'), userController.updateUser);
+
 router.delete('/:id', auth, role('admin'), userController.deleteUser);
 
 module.exports = router; 
