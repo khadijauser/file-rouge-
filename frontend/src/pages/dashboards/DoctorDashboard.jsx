@@ -2,6 +2,19 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest, galleryAPI } from '../../api';
 import { Calendar, Clock, User, Phone, CheckCircle, XCircle, Plus, Image, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'react-toastify';
+
+import { assetUrl } from '../../api';
+
+const getImageUrl = (path) => {
+  if (!path) return 'https://via.placeholder.com/300x200/cccccc/666666?text=No+Image';
+  
+  if (typeof path === 'string' && path.startsWith('data:')) {
+    return path;
+  }
+  
+  return assetUrl(path);
+};
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
@@ -19,12 +32,11 @@ const DoctorDashboard = () => {
     description: '',
     treatmentType: '',
     beforeImage: null,
-    afterImage: null,
-    patientConsent: false,
-    isPublic: true
+    afterImage: null
   });
+  const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch real appointments from API
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
@@ -41,31 +53,30 @@ const DoctorDashboard = () => {
     fetchAppointments();
   }, []);
 
-  // Handle appointment status updates
   const handleStatusUpdate = async (appointmentId, newStatus) => {
     try {
-      await apiRequest(`/appointments/${appointmentId}`, 'PUT', { status: newStatus });
-      // Refresh appointments
+      await apiRequest(`/appointments/${appointmentId}/status`, 'PUT', { status: newStatus });
+      toast.success(`Appointment ${newStatus} successfully`);
       const res = await apiRequest('/appointments');
       setAppointments(res.appointments || []);
     } catch (err) {
+      toast.error(err.message || 'Failed to update appointment status');
       setError(err.message || 'Failed to update appointment status');
     }
   };
 
-  // Handle appointment cancellation
   const handleCancelAppointment = async (appointmentId) => {
     try {
-      await apiRequest(`/appointments/${appointmentId}`, 'DELETE');
-      // Refresh appointments
+      await apiRequest(`/appointments/${appointmentId}/status`, 'PUT', { status: 'cancelled' });
+      toast.success('Appointment cancelled successfully');
       const res = await apiRequest('/appointments');
       setAppointments(res.appointments || []);
     } catch (err) {
+      toast.error(err.message || 'Failed to cancel appointment');
       setError(err.message || 'Failed to cancel appointment');
     }
   };
 
-  // Gallery functions
   const fetchGalleryItems = async () => {
     try {
       setGalleryLoading(true);
@@ -88,45 +99,35 @@ const DoctorDashboard = () => {
       description: '',
       treatmentType: '',
       beforeImage: null,
-      afterImage: null,
-      patientConsent: false,
-      isPublic: true
+      afterImage: null
     });
   };
+
+  const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
   const handleAddGalleryItem = async (e) => {
     e.preventDefault();
     try {
-      // Create FormData for file upload
-      const uploadFormData = new FormData();
-      uploadFormData.append('title', formData.title);
-      uploadFormData.append('description', formData.description);
-      uploadFormData.append('treatmentType', formData.treatmentType);
-      uploadFormData.append('patientConsent', formData.patientConsent);
-      uploadFormData.append('isPublic', formData.isPublic);
-      
-      if (formData.beforeImage) {
-        uploadFormData.append('beforeImage', formData.beforeImage);
-      }
-      if (formData.afterImage) {
-        uploadFormData.append('afterImage', formData.afterImage);
+      const before = formData.beforeImage ? await fileToDataUrl(formData.beforeImage) : null;
+      const after = formData.afterImage ? await fileToDataUrl(formData.afterImage) : null;
+
+      if (!before || !after) {
+        throw new Error('Both before and after images are required');
       }
 
-      // Get token for authorization
-      const token = localStorage.getItem('medibeauty_token');
-      
-      const response = await fetch('http://localhost:5000/api/gallery', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadFormData
+      await galleryAPI.addItem({
+        title: formData.title,
+        description: formData.description,
+        treatmentType: formData.treatmentType,
+        isPublic: true,
+        beforeImage: before,
+        afterImage: after
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add gallery item');
-      }
 
       setShowAddModal(false);
       resetForm();
@@ -139,47 +140,21 @@ const DoctorDashboard = () => {
   const handleEditGalleryItem = async (e) => {
     e.preventDefault();
     try {
-      // Create FormData for file upload
-      const uploadFormData = new FormData();
-      uploadFormData.append('title', formData.title);
-      uploadFormData.append('description', formData.description);
-      uploadFormData.append('treatmentType', formData.treatmentType);
-      uploadFormData.append('patientConsent', formData.patientConsent);
-      uploadFormData.append('isPublic', formData.isPublic);
-      
-      // Only append files if new ones are selected
-      if (formData.beforeImage) {
-        uploadFormData.append('beforeImage', formData.beforeImage);
-      }
-      if (formData.afterImage) {
-        uploadFormData.append('afterImage', formData.afterImage);
-      }
-      
-      // If no new files are selected, we need to send a flag to keep existing images
-      if (!formData.beforeImage && !formData.afterImage) {
-        uploadFormData.append('keepExistingImages', 'true');
-      }
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        treatmentType: formData.treatmentType,
+        isPublic: true
+      };
+      if (formData.beforeImage) payload.beforeImage = await fileToDataUrl(formData.beforeImage);
+      if (formData.afterImage) payload.afterImage = await fileToDataUrl(formData.afterImage);
 
-      // Get token for authorization
-      const token = localStorage.getItem('medibeauty_token');
-      
-      const response = await fetch(`http://localhost:5000/api/gallery/${editingItem._id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadFormData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update gallery item');
-      }
+      await galleryAPI.updateItem(editingItem._id, payload);
 
       setShowEditModal(false);
       setEditingItem(null);
       resetForm();
-      fetchGalleryItems();
+      await fetchGalleryItems();
     } catch (err) {
       setError(err.message);
     }
@@ -202,15 +177,12 @@ const DoctorDashboard = () => {
       title: item.title,
       description: item.description || '',
       treatmentType: item.treatmentType,
-      beforeImage: null, // Reset to null for file upload
-      afterImage: null,  // Reset to null for file upload
-      patientConsent: item.patientConsent,
-      isPublic: item.isPublic
+      beforeImage: null, 
+      afterImage: null  
     });
     setShowEditModal(true);
   };
 
-  // Generate schedule
   const generateSchedule = (date) => {
     const timeSlots = [
       '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -242,10 +214,6 @@ const DoctorDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const schedule = generateSchedule(selectedDate);
 
-
-
-
-
   const getStatusColor = (status) => {
     switch (status) {
       case 'confirmed': return 'bg-green-100 text-green-800';
@@ -266,7 +234,6 @@ const DoctorDashboard = () => {
     }
   };
 
-  // Calculate stats
   const today = new Date().toISOString().split('T')[0];
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   
@@ -294,28 +261,27 @@ const DoctorDashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 py-8 pt-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-400 to-medical-blue bg-clip-text text-transparent">
             Doctor Dashboard
           </h1>
           <p className="text-gray-600 mt-2">
-            Welcome back, {user?.name}. Manage your patients and schedule.
+            Welcome back, Dr. {user?.name}. Manage your appointments and patient gallery.
           </p>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white p-6 rounded-xl shadow-md">
+            <div key={index} className="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow hover:shadow-medical-pink/10 hover:-translate-y-1 duration-300">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-pink-400 to-medical-blue bg-clip-text text-transparent mt-1">{stat.value}</p>
                 </div>
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getStatColor(stat.color)}`}>
+                <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-gradient-to-r from-pink-400/20 to-medical-blue/20 text-medical-pink">
                   <Calendar className="w-6 h-6" />
                 </div>
               </div>
@@ -323,7 +289,6 @@ const DoctorDashboard = () => {
           ))}
         </div>
 
-        {/* Loading and Error States */}
         {loading && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600 mx-auto mb-4"></div>
@@ -337,36 +302,35 @@ const DoctorDashboard = () => {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
               <button
                 onClick={() => setActiveTab('appointments')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'appointments'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Appointments
               </button>
               <button
                 onClick={() => setActiveTab('schedule')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'schedule'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Schedule
               </button>
               <button
                 onClick={() => setActiveTab('gallery')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
                   activeTab === 'gallery'
-                    ? 'border-sky-500 text-sky-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-medical-pink text-medical-pink'
+                    : 'border-transparent text-gray-500 hover:text-medical-pink hover:border-medical-pink/30'
                 }`}
               >
                 Gallery Management
@@ -375,7 +339,6 @@ const DoctorDashboard = () => {
           </div>
 
           <div className="p-6">
-            {/* Appointments Tab */}
             {activeTab === 'appointments' && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center mb-6">
@@ -452,7 +415,6 @@ const DoctorDashboard = () => {
               </div>
             )}
 
-            {/* Schedule Tab */}
             {activeTab === 'schedule' && (
               <div>
                 <div className="flex justify-between items-center mb-6">
@@ -523,14 +485,13 @@ const DoctorDashboard = () => {
               </div>
             )}
 
-            {/* Gallery Tab */}
             {activeTab === 'gallery' && (
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-semibold text-gray-900">Gallery Management</h3>
                   <button 
                     onClick={() => setShowAddModal(true)}
-                    className="bg-sky-600 text-white px-4 py-2 rounded-lg hover:bg-sky-700 transition-colors flex items-center"
+                    className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300 flex items-center"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Images
@@ -549,32 +510,41 @@ const DoctorDashboard = () => {
                     <p className="text-gray-600 mb-6">Add your first before/after treatment results.</p>
                     <button 
                       onClick={() => setShowAddModal(true)}
-                      className="bg-sky-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-sky-700 transition-colors"
+                      className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300"
                     >
                       Add First Item
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {galleryItems.map((item) => (
                       <div key={item._id} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-3">
+                        <div className="mb-3">
                           <h4 className="font-semibold text-gray-900">{item.title}</h4>
-                          {item.isPublic ? (
-                            <Eye className="w-4 h-4 text-green-600" title="Public" />
-                          ) : (
-                            <EyeOff className="w-4 h-4 text-gray-400" title="Private" />
-                          )}
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2 mb-3">
                           <div>
                             <p className="text-xs text-gray-600 mb-1">Before</p>
-                            <img src={item.beforeImage} alt="Before" className="w-full h-24 object-cover rounded" />
+                            <img 
+                              src={getImageUrl(item.beforeImage)} 
+                              alt="Before" 
+                              className="w-full h-40 object-cover rounded" 
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkJlZm9yZTwvdGV4dD48L3N2Zz4=';
+                              }}
+                            />
                           </div>
                           <div>
                             <p className="text-xs text-gray-600 mb-1">After</p>
-                            <img src={item.afterImage} alt="After" className="w-full h-24 object-cover rounded" />
+                            <img 
+                              src={getImageUrl(item.afterImage)} 
+                              alt="After" 
+                              className="w-full h-40 object-cover rounded" 
+                              onError={(e) => {
+                                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFmdGVyPC90ZXh0Pjwvc3ZnPg==';
+                              }}
+                            />
                           </div>
                         </div>
                         
@@ -586,17 +556,12 @@ const DoctorDashboard = () => {
                           <p className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</p>
                         </div>
                         
-                        <div className="flex justify-between items-center text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            item.patientConsent ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {item.patientConsent ? 'Consent Given' : 'No Consent'}
-                          </span>
+                        <div className="flex justify-end items-center text-sm">
                           <div className="flex gap-2">
-                            <button onClick={() => openEditModal(item)} className="text-sky-600 hover:text-sky-700 flex items-center">
+                            <button onClick={() => openEditModal(item)} className="text-medical-pink hover:text-medical-blue transition-colors duration-300 flex items-center">
                               <Edit className="w-3 h-3 mr-1" />Edit
                             </button>
-                            <button onClick={() => handleDeleteGalleryItem(item._id)} className="text-red-600 hover:text-red-700 flex items-center">
+                            <button onClick={() => handleDeleteGalleryItem(item._id)} className="text-red-500 hover:text-red-600 transition-colors duration-300 flex items-center">
                               <Trash2 className="w-3 h-3 mr-1" />Delete
                             </button>
                           </div>
@@ -604,14 +569,7 @@ const DoctorDashboard = () => {
                       </div>
                     ))}
                     
-                    <div 
-                      onClick={() => setShowAddModal(true)}
-                      className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center min-h-[200px] hover:border-sky-400 hover:bg-sky-50 transition-colors cursor-pointer"
-                    >
-                      <Image className="w-8 h-8 text-gray-400 mb-2" />
-                      <p className="text-gray-600 text-sm font-medium">Add New Before/After</p>
-                      <p className="text-gray-500 text-xs">Upload treatment results</p>
-                    </div>
+
                   </div>
                 )}
               </div>
@@ -620,7 +578,6 @@ const DoctorDashboard = () => {
         </div>
       </div>
 
-      {/* Add Gallery Item Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -633,22 +590,36 @@ const DoctorDashboard = () => {
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink"
                 />
                 
                 <select
                   value={formData.treatmentType}
                   onChange={(e) => setFormData({...formData, treatmentType: e.target.value})}
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink"
                 >
                   <option value="">Select treatment type</option>
-                  <option value="Botox">Botox</option>
-                  <option value="Dermal Fillers">Dermal Fillers</option>
-                  <option value="Chemical Peel">Chemical Peel</option>
-                  <option value="Laser Treatment">Laser Treatment</option>
-                  <option value="Microdermabrasion">Microdermabrasion</option>
-                  <option value="Other">Other</option>
+                  <optgroup label="Aesthetic Medicine">
+                    <option value="aesthetic-botox">Botox</option>
+                    <option value="aesthetic-fillers">Dermal Fillers</option>
+                    <option value="aesthetic-chemical">Chemical Peel</option>
+                    <option value="aesthetic-laser">Laser Treatment</option>
+                    <option value="aesthetic-other">Other Aesthetic Treatments</option>
+                  </optgroup>
+                  <optgroup label="Dental Care">
+                    <option value="dental-whitening">Teeth Whitening</option>
+                    <option value="dental-veneers">Veneers</option>
+                    <option value="dental-implants">Dental Implants</option>
+                    <option value="dental-orthodontics">Orthodontics</option>
+                    <option value="dental-other">Other Dental Treatments</option>
+                  </optgroup>
+                  <optgroup label="Dermatology">
+                    <option value="dermatology-acne">Acne Treatment</option>
+                    <option value="dermatology-scar">Scar Revision</option>
+                    <option value="dermatology-pigmentation">Pigmentation Treatment</option>
+                    <option value="dermatology-other">Other Dermatology Treatments</option>
+                  </optgroup>
                 </select>
                 
                 <textarea
@@ -656,7 +627,7 @@ const DoctorDashboard = () => {
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   rows="3"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink"
                 />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -667,7 +638,7 @@ const DoctorDashboard = () => {
                       accept="image/*"
                       onChange={(e) => setFormData({...formData, beforeImage: e.target.files[0]})}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink file:bg-medical-pink/20 file:text-gray-700 file:border-0 file:rounded file:px-3 file:py-1 file:mr-3"
                     />
                   </div>
                   <div>
@@ -677,37 +648,18 @@ const DoctorDashboard = () => {
                       accept="image/*"
                       onChange={(e) => setFormData({...formData, afterImage: e.target.files[0]})}
                       required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-pink file:bg-medical-pink/20 file:text-gray-700 file:border-0 file:rounded file:px-3 file:py-1 file:mr-3"
                     />
                   </div>
                 </div>
                 
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.patientConsent}
-                      onChange={(e) => setFormData({...formData, patientConsent: e.target.checked})}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Patient consent obtained</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isPublic}
-                      onChange={(e) => setFormData({...formData, isPublic: e.target.checked})}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Make public</span>
-                  </label>
-                </div>
+
                 
                 <div className="flex gap-3 pt-4">
-                  <button type="submit" className="flex-1 bg-sky-600 text-white py-2 px-4 rounded-lg hover:bg-sky-700 transition-colors">
+                  <button type="submit" className="flex-1 bg-gradient-to-r from-medical-pink to-medical-blue text-white py-2 px-4 rounded-lg hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300">
                     Add Item
                   </button>
-                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-all duration-300">
                     Cancel
                   </button>
                 </div>
@@ -717,7 +669,6 @@ const DoctorDashboard = () => {
         </div>
       )}
 
-      {/* Edit Gallery Item Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -743,12 +694,26 @@ const DoctorDashboard = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
                     <option value="">Select treatment type</option>
-                    <option value="Botox">Botox</option>
-                    <option value="Dermal Fillers">Dermal Fillers</option>
-                    <option value="Chemical Peel">Chemical Peel</option>
-                    <option value="Laser Treatment">Laser Treatment</option>
-                    <option value="Microdermabrasion">Microdermabrasion</option>
-                    <option value="Other">Other</option>
+                    <optgroup label="Aesthetic Medicine">
+                      <option value="aesthetic-botox">Botox</option>
+                      <option value="aesthetic-fillers">Dermal Fillers</option>
+                      <option value="aesthetic-chemical">Chemical Peel</option>
+                      <option value="aesthetic-laser">Laser Treatment</option>
+                      <option value="aesthetic-other">Other Aesthetic Treatments</option>
+                    </optgroup>
+                    <optgroup label="Dental Care">
+                      <option value="dental-whitening">Teeth Whitening</option>
+                      <option value="dental-veneers">Veneers</option>
+                      <option value="dental-implants">Dental Implants</option>
+                      <option value="dental-orthodontics">Orthodontics</option>
+                      <option value="dental-other">Other Dental Treatments</option>
+                    </optgroup>
+                    <optgroup label="Dermatology">
+                      <option value="dermatology-acne">Acne Treatment</option>
+                      <option value="dermatology-scar">Scar Revision</option>
+                      <option value="dermatology-pigmentation">Pigmentation Treatment</option>
+                      <option value="dermatology-other">Other Dermatology Treatments</option>
+                    </optgroup>
                   </select>
                 </div>
                 <div>
@@ -770,7 +735,17 @@ const DoctorDashboard = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                     />
                     {editingItem?.beforeImage && (
-                      <p className="text-xs text-gray-500 mt-1">Current: {editingItem.beforeImage}</p>
+                      <div className="mt-1">
+                        <p className="text-xs text-gray-500 mb-1">Current image:</p>
+                        <img 
+                          src={getImageUrl(editingItem.beforeImage)} 
+                          alt="Current Before" 
+                          className="w-full h-20 object-cover rounded mt-1" 
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkJlZm9yZTwvdGV4dD48L3N2Zz4=';
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                   <div>
@@ -782,41 +757,32 @@ const DoctorDashboard = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
                     />
                     {editingItem?.afterImage && (
-                      <p className="text-xs text-gray-500 mt-1">Current: {editingItem.afterImage}</p>
+                      <div className="mt-1">
+                        <p className="text-xs text-gray-500 mb-1">Current image:</p>
+                        <img 
+                          src={getImageUrl(editingItem.afterImage)} 
+                          alt="Current After" 
+                          className="w-full h-20 object-cover rounded mt-1" 
+                          onError={(e) => {
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjY2NjY2NjIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzY2NjY2NiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFmdGVyPC90ZXh0Pjwvc3ZnPg==';
+                          }}
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.patientConsent}
-                      onChange={(e) => setFormData({...formData, patientConsent: e.target.checked})}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Patient consent obtained</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isPublic}
-                      onChange={(e) => setFormData({...formData, isPublic: e.target.checked})}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">Make public</span>
-                  </label>
-                </div>
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="submit"
-                    className="flex-1 bg-sky-600 text-white py-2 px-4 rounded-lg hover:bg-sky-700 transition-colors"
+                    className="flex-1 bg-gradient-to-r from-medical-pink to-medical-blue text-white py-2 px-4 rounded-lg hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300"
                   >
                     Update Item
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowEditModal(false)}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
+                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-all duration-300"
                   >
                     Cancel
                   </button>
