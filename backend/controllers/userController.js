@@ -29,6 +29,11 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
@@ -120,11 +125,38 @@ exports.listUsers = async (req, res) => {
   }
 };
 
-exports.deleteUser = async (req, res) => {
+exports.updateUser = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'User deleted' });
+    const { name, email, role, phone, password } = req.body;
+    
+    const updateData = { name, email, role, phone };
+    
+    if (password && password.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ message: 'User updated successfully', user });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
-}; 
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
