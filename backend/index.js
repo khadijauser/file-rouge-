@@ -8,12 +8,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-mongoose.connect(process.env.MONGO_URI)
-.then(() => console.log('MongoDB connected'))
+const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/medibeauty';
+mongoose.connect(mongoUri)
+.then(() => console.log('MongoDB connected to:', mongoUri))
 .catch((err) => console.error('MongoDB connection error:', err));
 
 app.get('/', (req, res) => {
@@ -23,35 +25,14 @@ app.get('/', (req, res) => {
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
+app.use('/api/services', require('./routes/serviceRoutes'));
 
-app.get('/api/debug/appointments', async (req, res) => {
-  try {
-    const Appointment = require('./models/Appointment');
-    const allAppointments = await Appointment.find().populate('patient doctor', 'name email role');
-    res.json({
-      message: 'Debug: All appointments in database',
-      count: allAppointments.length,
-      appointments: allAppointments
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
-app.get('/api/debug/users', async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const allUsers = await User.find({}, 'name email role');
-    res.json({
-      message: 'Debug: All users in database',
-      count: allUsers.length,
-      users: allUsers
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
