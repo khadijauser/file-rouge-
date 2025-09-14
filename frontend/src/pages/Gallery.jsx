@@ -26,7 +26,8 @@ const Gallery = () => {
       try {
         setLoading(true);
         const res = await galleryAPI.getPublic();
-        setGalleryItems(res.galleryItems || []);
+        const items = res.galleryItems || [];
+        setGalleryItems(items);
       } catch (err) {
         setError(err.message || 'Failed to load gallery items');
       } finally {
@@ -47,36 +48,35 @@ const Gallery = () => {
   const getCategoryFromTreatmentType = (treatmentType) => {
     if (!treatmentType) return 'all';
     
-    if (treatmentType.startsWith('aesthetic-')) return 'aesthetic';
-    if (treatmentType.startsWith('dental-')) return 'dental';
-    if (treatmentType.startsWith('dermatology-')) return 'dermatology';
+    const type = treatmentType.toLowerCase();
     
-    const legacyMapping = {
-      'Botox': 'aesthetic',
-      'Dermal Fillers': 'aesthetic',
-      'Chemical Peel': 'aesthetic',
-      'Laser Treatment': 'aesthetic',
-      'Microdermabrasion': 'aesthetic',
-      'plastic surgery': 'aesthetic'
-    };
+    if (type.includes('aesthetic') || type.includes('botox') || type.includes('filler') || 
+        type.includes('chemical') || type.includes('laser') || type.includes('plastic')) {
+      return 'aesthetic';
+    }
+    if (type.includes('dental') || type.includes('tooth') || type.includes('teeth')) {
+      return 'dental';
+    }
+    if (type.includes('dermatology') || type.includes('skin') || type.includes('acne')) {
+      return 'dermatology';
+    }
     
-    return legacyMapping[treatmentType] || 'all';
+    return 'all';
   };
 
-
-  const displayItems = galleryItems || [];
-
-  const filteredItems = displayItems?.filter(item => {
+  const filteredItems = galleryItems.filter(item => {
     if (!item) return false;
     
-    const matchesCategory = selectedCategory === 'all' || 
-      getCategoryFromTreatmentType(item.treatmentType) === selectedCategory;
+    const itemCategory = getCategoryFromTreatmentType(item.treatmentType);
+    const matchesCategory = selectedCategory === 'all' || itemCategory === selectedCategory;
+    
     const matchesSearch = !searchTerm || 
-      (item.title && item.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.treatmentType?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesCategory && matchesSearch;
-  }) || [];
+  });
 
   return (
     <div className="min-h-screen">
@@ -171,7 +171,7 @@ Discover our collection of real before-and-after transformations, showcasing the
               filteredItems.map((item) => (
                 <div
                   key={item._id}
-                  className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg overflow-hidden hover:shadow-xl hover:shadow-medical-pink/10 transition-all duration-300 cursor-pointer border border-white/10 group"
+                  className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg overflow-hidden hover:shadow-xl hover:shadow-medical-pink/10 transition-all duration-300 cursor-pointer border border-white/10 group flex flex-col h-full"
                   onClick={() => setSelectedImage(item)}
                 >
                   <div className="relative">
@@ -206,15 +206,20 @@ Discover our collection of real before-and-after transformations, showcasing the
                       </div>
                     </div>
                   </div>
-                  <div className="p-6">
+                  <div className="p-6 flex flex-col flex-grow">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="text-xl font-semibold text-white group-hover:text-medical-pink transition-colors duration-300">{item.title}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getCategoryFromTreatmentType(item.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : getCategoryFromTreatmentType(item.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
-                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(item.treatmentType))?.name || 'Other'}
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        getCategoryFromTreatmentType(item.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : 
+                        getCategoryFromTreatmentType(item.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 
+                        getCategoryFromTreatmentType(item.treatmentType) === 'dermatology' ? 'bg-green-500/20 text-green-300' :
+                        'bg-gray-500/20 text-gray-300'
+                      }`}>
+                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(item.treatmentType))?.name || 'General'}
                       </span>
                     </div>
-                    <p className="text-white/70 mb-3">{item.description}</p>
-                    <div className="flex justify-between items-center text-sm text-white/60">
+                    <p className="text-white/70 mb-3 flex-grow">{item.description}</p>
+                    <div className="flex justify-between items-center text-sm text-white/60 mt-auto">
                       <span>{item.doctor?.name || 'Unknown Doctor'}</span>
                       <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                     </div>
@@ -229,12 +234,17 @@ Discover our collection of real before-and-after transformations, showcasing the
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-medium text-white mb-2">No Gallery Items Yet</h3>
+                  <h3 className="text-lg font-medium text-white mb-2">
+                    {galleryItems.length === 0 ? 'No Gallery Items Yet' : 'No Results Found'}
+                  </h3>
                   <p className="text-white/70 mb-4">
-                    {user && (user.role === 'doctor' || user.role === 'admin') 
-                      ? 'Upload some before/after images to showcase your work.'
-                      : 'Check back soon to see our treatment results and transformations.'
-                    }
+                    {galleryItems.length === 0 ? (
+                      user && (user.role === 'doctor' || user.role === 'admin') 
+                        ? 'Upload some before/after images to showcase your work.'
+                        : 'Check back soon to see our treatment results and transformations.'
+                    ) : (
+                      'No results found matching your search criteria. Try adjusting your filters.'
+                    )}
                   </p>
                 </div>
               </div>
@@ -242,11 +252,6 @@ Discover our collection of real before-and-after transformations, showcasing the
           </div>
         )}
 
-        {!loading && !error && filteredItems.length === 0 && galleryItems.length > 0 && (
-          <div className="text-center py-12">
-            <p className="text-white/70 text-lg">No results found matching your criteria</p>
-          </div>
-        )}
         {selectedImage && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-gradient-to-br from-black/90 to-medical-blue/30 backdrop-blur-md rounded-xl shadow-2xl max-w-5xl w-full max-h-[95vh] overflow-y-auto border border-white/10">
@@ -257,8 +262,13 @@ Discover our collection of real before-and-after transformations, showcasing the
                       <h3 className="text-2xl font-bold text-white">
                         <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">{selectedImage.title}</span>
                       </h3>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getCategoryFromTreatmentType(selectedImage.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : getCategoryFromTreatmentType(selectedImage.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/20 text-green-300'}`}>
-                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(selectedImage.treatmentType))?.name || 'Other'}
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        getCategoryFromTreatmentType(selectedImage.treatmentType) === 'aesthetic' ? 'bg-medical-pink/20 text-medical-pink' : 
+                        getCategoryFromTreatmentType(selectedImage.treatmentType) === 'dental' ? 'bg-blue-500/20 text-blue-300' : 
+                        getCategoryFromTreatmentType(selectedImage.treatmentType) === 'dermatology' ? 'bg-green-500/20 text-green-300' :
+                        'bg-gray-500/20 text-gray-300'
+                      }`}>
+                        {categories.find(cat => cat.id === getCategoryFromTreatmentType(selectedImage.treatmentType))?.name || 'General'}
                       </span>
                     </div>
                     <p className="text-white/80">{selectedImage.description}</p>

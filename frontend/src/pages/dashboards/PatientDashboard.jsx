@@ -67,7 +67,6 @@ const PatientDashboard = () => {
 
   const nextAppointment = categorized.upcoming[0] || null;
 
-  // Profile editing functions
   const handleProfileEdit = () => {
     setEditingProfile(true);
     setProfileSuccess('');

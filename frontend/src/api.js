@@ -28,26 +28,37 @@ export async function apiRequest(endpoint, method = 'GET', data) {
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const options = {
+  const options = { method, headers };
+  if (data) options.body = JSON.stringify(data);
+
+  console.log('API Request:', {
+    url: `${API_URL}${endpoint}`,
     method,
     headers,
-  };
-  if (data) options.body = JSON.stringify(data);
+    hasData: !!data
+  });
 
   try {
     const res = await fetch(`${API_URL}${endpoint}`, options);
+    const payload = await res.json().catch(() => ({}));
     
-    const text = await res.text();
-    let payload;
-    try {
-      payload = text ? JSON.parse(text) : {};
-    } catch {
-      payload = { message: text };
-    }
-
     if (!res.ok) {
-      const message = payload?.message || payload?.error || res.statusText || 'Request failed';
-      const error = new Error(message);
+      console.error('API Error Response:', {
+        status: res.status,
+        statusText: res.statusText,
+        payload
+      });
+      
+      // Handle 403 errors gracefully
+      if (res.status === 403) {
+        console.warn('Access denied:', payload?.error || 'Insufficient permissions');
+        const error = new Error(payload?.error || 'Access denied. You do not have permission to perform this action.');
+        error.status = res.status;
+        error.data = payload;
+        throw error;
+      }
+      
+      const error = new Error(payload?.message || 'Request failed');
       error.status = res.status;
       error.data = payload;
       throw error;

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api';
 import { Calendar, Clock, User, Phone, Mail, FileText } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { validateForm } from '../utils/validation';
 
 const BookAppointment = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const BookAppointment = () => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const timeSlots = [
@@ -42,78 +44,76 @@ const BookAppointment = () => {
     fetchDoctors();
   }, []);
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.doctor) {
-      newErrors.doctor = 'Please select a doctor';
-    }
-    
-    if (!formData.date) {
-      newErrors.date = 'Please select a date';
-    } else {
-      const selectedDate = new Date(formData.date);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      if (selectedDate < today) {
-        newErrors.date = 'Appointment date cannot be in the past';
+  const validateField = (field) => {
+    const fieldConfig = {
+      [field]: {
+        value: formData[field],
+        required: true,
+        type: field === 'date' ? 'date' : field === 'time' ? 'time' : 'text',
       }
-    }
+    };
+
+    const { errors: fieldErrors } = validateForm(fieldConfig);
+    setErrors(prev => ({
+      ...prev,
+      [field]: fieldErrors[field] || []
+    }));
+  };
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({
+      ...prev,
+      [field]: true
+    }));
     
-    if (!formData.time) {
-      newErrors.time = 'Please select a time';
-    } else if (formData.date) {
-      const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
-      const now = new Date();
-      
-      if (selectedDateTime < now) {
-        newErrors.time = 'Appointment time cannot be in the past';
-      }
+    if (touched[field] || formData[field]) {
+      validateField(field);
     }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    setError(null);
     
-    if (!validateForm()) {
-      toast.error('Please fix the form errors');
+    const fieldsToValidate = {
+      doctor: { value: formData.doctor, required: true },
+      date: { value: formData.date, required: true, type: 'date' },
+      time: { value: formData.time, required: true, type: 'time' },
+      notes: { value: formData.notes, required: false }
+    };
+
+    const { isValid, errors: formErrors } = validateForm(fieldsToValidate);
+    setErrors(formErrors);
+    
+    const allTouched = Object.keys(formData).reduce((acc, key) => ({
+      ...acc,
+      [key]: true
+    }), {});
+    setTouched(allTouched);
+
+    if (!isValid) {
+      toast.error('Please correct the errors in the form');
       return;
     }
-    
-    try {
-      setIsSubmitting(true);
-      setError(null);
-      setErrors({});
 
-      const appointmentData = {
+    setLoading(true);
+
+    try {
+      await apiRequest('/appointments', 'POST', {
         doctor: formData.doctor,
         date: formData.date,
         time: formData.time,
-        notes: formData.notes || ''
-      };
-
-      const response = await apiRequest('/appointments', 'POST', appointmentData);
-      
-      if (response.message === 'Appointment booked successfully') {
-        setSuccess(true);
-        toast.success('Appointment booked successfully! Redirecting...');
-        setTimeout(() => {
-          navigate('/my-appointments');
-        }, 2000);
-      } else {
-        throw new Error('Unexpected response from server');
-      }
+        notes: formData.notes
+      });
+      setSuccess(true);
+      toast.success('Appointment booked successfully');
+      navigate('/my-appointments');
     } catch (err) {
-      toast.error(err.message || 'Booking failed. Please try again.');
-      setError(err.message || 'Booking failed. Please try again.');
+      setError(err.message || 'An error occurred');
+      toast.error('Failed to book appointment');
     } finally {
-      setIsSubmitting(false);
-    }
+      setLoading(false);
+    }  
   };
 
   const handleChange = (e) => {
@@ -168,7 +168,11 @@ const BookAppointment = () => {
   }
 
   if (loading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
   }
 
   if (success) {
@@ -193,7 +197,7 @@ const BookAppointment = () => {
     <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-4">
+          <h1 className="text-3xl font-bold mb-8 mt-8 ">
             <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">Book Your Appointment</span>
           </h1>
           <p className="text-lg text-gray-600">
@@ -202,7 +206,6 @@ const BookAppointment = () => {
         </div>
         <div className="bg-white rounded-xl shadow-lg p-8 border border-medical-blue/10 hover:shadow-xl transition-all duration-300">
           <form onSubmit={handleSubmit} className="space-y-6">
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Preferred Doctor
@@ -211,8 +214,11 @@ const BookAppointment = () => {
                 name="doctor"
                 value={formData.doctor}
                 onChange={handleChange}
+                onBlur={() => handleBlur('doctor')}
                 required
-                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-blue focus:border-medical-blue transition-all duration-300"
+                className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
+                  touched.doctor && errors.doctor ? 'border-red-500' : ''
+                }`}
               >
                 <option value="">Choose a doctor</option>
                 {doctors.map((doctor) => (
@@ -221,35 +227,57 @@ const BookAppointment = () => {
                   </option>
                 ))}
               </select>
+              {touched.doctor && errors.doctor && (
+                <div className="text-red-500 text-xs mt-1">
+                  {errors.doctor.map((error, index) => (
+                    <div key={index}>{error}</div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Calendar className="inline w-4 h-4 mr-1" />
-                  Preferred Date
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="date">
+                  <Calendar className="inline-block mr-1" size={18} />
+Date *
                 </label>
                 <input
+                  id="date"
                   type="date"
                   name="date"
                   value={formData.date}
                   onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
+                  onBlur={() => handleBlur('date')}
+                  className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
+                    touched.date && errors.date ? 'border-red-500' : ''
+                  }`}
                   required
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-blue focus:border-medical-blue transition-all duration-300"
+                  min={new Date().toISOString().split('T')[0]}
                 />
+                {touched.date && errors.date && (
+                  <div className="text-red-500 text-xs mt-1">
+                    {errors.date.map((error, index) => (
+                      <div key={index}>{error}</div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Clock className="inline w-4 h-4 mr-1" />
-                  Preferred Time
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="time">
+                  <Clock className="inline-block mr-1" size={18} />
+Time *
                 </label>
                 <select
+                  id="time"
                   name="time"
                   value={formData.time}
                   onChange={handleChange}
+                  onBlur={() => handleBlur('time')}
+                  className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
+                    touched.time && errors.time ? 'border-red-500' : ''
+                  }`}
                   required
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-blue focus:border-medical-blue transition-all duration-300"
                 >
                   <option value="">Select time</option>
                   {timeSlots.map((time) => (
@@ -258,6 +286,13 @@ const BookAppointment = () => {
                     </option>
                   ))}
                 </select>
+                {touched.time && errors.time && (
+                  <div className="text-red-500 text-xs mt-1">
+                    {errors.time.map((error, index) => (
+                      <div key={index}>{error}</div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

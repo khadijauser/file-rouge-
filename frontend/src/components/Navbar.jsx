@@ -155,7 +155,7 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mo menu b */}
+
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -171,7 +171,7 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* MO MENU */}
+
       <div 
         className={`md:hidden fixed inset-x-0 top-16 bg-black bg-opacity-80 backdrop-blur-md transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}
       >
@@ -209,7 +209,7 @@ const Navbar = () => {
                 <div className="mt-4 pt-4 border-t border-white/10"></div>
                 <Link
                   to={getDashboardPath()}
-                  className={`block px-4 py-2.5 rounded-md ${isActive(getDashboardPath()) ? 'bg-white/10 text-medical-pink' : 'text-white hover:bg-white/5'} transition-all duration-300 flex items-center space-x-3`}
+                  className={`px-4 py-2.5 rounded-md ${isActive(getDashboardPath()) ? 'bg-white/10 text-medical-pink' : 'text-white hover:bg-white/5'} transition-all duration-300 flex items-center space-x-3`}
                   onClick={(e) => handleLinkClick(e, getDashboardPath())}
                 >
                 <span className="w-1.5 h-1.5 rounded-full bg-medical-green"></span>
@@ -229,7 +229,7 @@ const Navbar = () => {
                 <div className="mt-4 pt-4 border-t border-white/10"></div>
                 <Link
                   to="/login"
-                  className="block px-4 py-2.5 rounded-md text-white hover:bg-white/5 transition-all duration-300 flex items-center space-x-3"
+                  className="px-4 py-2.5 rounded-md text-white hover:bg-white/5 transition-all duration-300 flex items-center space-x-3"
                   onClick={(e) => handleLinkClick(e, '/login')}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-medical-blue"></span>
@@ -237,7 +237,7 @@ const Navbar = () => {
                 </Link>
                 <Link
                   to="/register"
-                  className="mt-2 block px-4 py-2.5 rounded-md bg-gradient-to-r from-medical-pink to-medical-blue text-white transition-all duration-300 flex items-center space-x-3 font-medium hover:shadow-lg hover:shadow-medical-pink/20"
+                  className="mt-2 px-4 py-2.5 rounded-md bg-gradient-to-r from-medical-pink to-medical-blue text-white transition-all duration-300 flex items-center space-x-3 font-medium hover:shadow-lg hover:shadow-medical-pink/20"
                   onClick={(e) => handleLinkClick(e, '/register')}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-white"></span>

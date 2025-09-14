@@ -45,25 +45,31 @@ const Login = () => {
     
     try {
       setIsSubmitting(true);
-      setError(null);
       setErrors({});
       
-      const loggedInUser = await login(formData);
+      const result = await login(formData);
       
-      if (loggedInUser) {
-        toast.success(`Welcome back, ${loggedInUser.name}!`);
+      if (result) {
+        toast.success(`Welcome back, ${result.name || 'User'}!`);
         
-        // Redirect based on user role
         const dashboardRoutes = {
           'patient': '/patient-dashboard',
           'doctor': '/doctor-dashboard',
           'admin': '/admin-dashboard'
         };
         
-        navigate(dashboardRoutes[loggedInUser.role] || '/');
+        const redirectPath = new URLSearchParams(window.location.search).get('redirect');
+        navigate(redirectPath || dashboardRoutes[result.role] || '/');
       }
     } catch (err) {
-      toast.error(err.message || 'Login failed');
+      if (err.message.includes('403') || err.message.includes('permission')) {
+        toast.error('You do not have permission to access this account. Please contact support.');
+      } else if (err.message.includes('401') || err.message.includes('invalid')) {
+        toast.error('Invalid email or password');
+      } else {
+        toast.error(err.message || 'Login failed. Please try again.');
+      }
+      console.error('Login error:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -76,7 +82,6 @@ const Login = () => {
       [name]: value
     });
     
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors({
         ...errors,

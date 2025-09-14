@@ -23,16 +23,23 @@ export const AuthProvider = ({ children }) => {
         const profile = await apiRequest('/users/me');
         setUser(profile);
       } catch (err) {
-        setUser(null);
-        clearToken();
+        if (err.status !== 403) {
+          setUser(null);
+          clearToken();
+        }
       } finally {
         setLoading(false);
       }
     };
-    if (getToken()) {
+    
+    const token = getToken();
+    if (token) {
       fetchProfile();
     } else {
       setLoading(false);
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      }
     }
   }, []);
 
@@ -40,12 +47,46 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     try {
       const res = await apiRequest('/users/login', 'POST', data);
+      
+      if (res?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        return {
+          requiresPasswordChange: true,
+          resetToken: res.resetToken,
+          email: data.email
+        };
+      }
+      
+      if (!res || !res.token || !res.user) {
+        throw new Error('Invalid response from server');
+      }
+      
       setToken(res.token);
-      setUser(res.user);
-      return res.user;
+      
+      const userData = {
+        ...res.user,
+        role: res.user.role || 'patient',
+        permissions: res.user.permissions || []
+      };
+      
+      setUser(userData);
+      return userData;
+      
     } catch (err) {
-      setError(err.message || 'Login failed');
-      return null;
+      console.error('Login error:', err);
+      
+      let errorMessage = 'Login failed';
+      if (err.response?.data?.code === 'ACCOUNT_INACTIVE') {
+        errorMessage = 'Your account is inactive. Please contact support.';
+      } else if (err.response?.data?.code === 'INVALID_CREDENTIALS') {
+        errorMessage = 'Invalid email or password';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 

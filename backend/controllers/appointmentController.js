@@ -43,8 +43,8 @@ exports.bookAppointment = async (req, res) => {
     await appointment.save();
 
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate('patient', 'name email')
-      .populate('doctor', 'name email');
+      .populate('patient', 'name email phone')
+      .populate('doctor', 'name email phone');
 
     res.status(201).json({ 
       message: 'Appointment booked successfully', 
@@ -60,11 +60,11 @@ exports.getAppointments = async (req, res) => {
     let appointments;
     
     if (req.user.role === 'admin') {
-      appointments = await Appointment.find().populate('patient doctor', 'name email role');
+      appointments = await Appointment.find().populate('patient doctor', 'name email role phone');
     } else if (req.user.role === 'doctor') {
-      appointments = await Appointment.find({ doctor: req.user.id }).populate('patient doctor', 'name email role');
+      appointments = await Appointment.find({ doctor: req.user.id }).populate('patient doctor', 'name email role phone');
     } else {
-      appointments = await Appointment.find({ patient: req.user.id }).populate('patient doctor', 'name email role');
+      appointments = await Appointment.find({ patient: req.user.id }).populate('patient doctor', 'name email role phone');
     }
     
     const now = new Date();
@@ -85,7 +85,6 @@ exports.getAppointments = async (req, res) => {
       } else if (apptDateTime >= now) {
         acc.upcoming.push(appt);
       } else {
-        // If appt is in the past and still pending/confirmed, mark for auto-update
         if (appt.status === 'pending' || appt.status === 'confirmed') {
           pastPendingAppointments.push(appt._id);
           appt.status = 'completed';
@@ -129,21 +128,21 @@ exports.getUpcomingAppointments = async (req, res) => {
     
     if (req.user.role === 'admin') {
       appointments = await Appointment.find({ status: { $nin: ['cancelled', 'completed'] } })
-        .populate('patient doctor', 'name email role')
+        .populate('patient doctor', 'name email role phone')
         .sort({ date: 1, time: 1 });
     } else if (req.user.role === 'doctor') {
       appointments = await Appointment.find({ 
         doctor: req.user.id, 
         status: { $nin: ['cancelled', 'completed'] } 
       })
-        .populate('patient doctor', 'name email role')
+        .populate('patient doctor', 'name email role phone')
         .sort({ date: 1, time: 1 });
     } else {
       appointments = await Appointment.find({ 
         patient: req.user.id, 
         status: { $nin: ['cancelled', 'completed'] } 
       })
-        .populate('patient doctor', 'name email role')
+        .populate('patient doctor', 'name email role phone')
         .sort({ date: 1, time: 1 });
     }
     const now = new Date();
@@ -161,7 +160,7 @@ exports.getUpcomingAppointments = async (req, res) => {
 exports.getAppointmentById = async (req, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id)
-      .populate('patient doctor', 'name email role');
+      .populate('patient doctor', 'name email role phone');
     
     if (!appointment) {
       return res.status(404).json({ message: 'Appointment not found' });
@@ -200,7 +199,6 @@ exports.updateAppointmentStatus = async (req, res) => {
     
     appointment.status = status;
     
-    // important for the 30d visibil rule
     if (status === 'cancelled') {
       appointment.updatedAt = new Date();
     }
@@ -267,7 +265,7 @@ exports.updateAppointment = async (req, res) => {
     await appointment.save();
     
     const populatedAppointment = await Appointment.findById(appointment._id)
-      .populate('patient doctor', 'name email');
+      .populate('patient doctor', 'name email phone');
     
     res.json({ 
       message: 'Appointment updated successfully', 

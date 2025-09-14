@@ -24,7 +24,6 @@ const MyAppointments = () => {
     try {
       const res = await apiRequest('/appointments');
       
-      // Handle both response formats (backward compatibility)
       const appointmentsData = res.appointments || res || [];
       
       setAppointments(appointmentsData);
@@ -39,7 +38,6 @@ const MyAppointments = () => {
     fetchAppointments();
   }, []);
 
-  // Categorize appointments
   const categorizeAppointments = () => {
     if (!appointments || appointments.length === 0) {
       return { upcoming: [], past: [], completed: [], cancelled: [] };
@@ -48,7 +46,6 @@ const MyAppointments = () => {
     const now = new Date();
     
     const result = appointments.reduce((acc, appt) => {
-      // Handle different date formats and edge cases
       let apptDateTime;
       try {
         if (appt.date && appt.time) {
@@ -73,7 +70,6 @@ const MyAppointments = () => {
           acc.past.push(appt);
         }
       } catch (error) {
-        // Add to past as fallback
         acc.past.push(appt);
       }
       
@@ -83,7 +79,6 @@ const MyAppointments = () => {
     return result;
   };
 
-  // Sort appointments by date and time
   const sortAppointments = (appointments) => {
     return appointments.sort((a, b) => {
       const dateA = new Date(a.date + 'T' + a.time);
@@ -92,7 +87,6 @@ const MyAppointments = () => {
     });
   };
 
-  // Get time until appointment
   const getTimeUntilAppointment = (date, time) => {
     const now = new Date();
     const apptDateTime = new Date(date + 'T' + time);
@@ -109,8 +103,6 @@ const MyAppointments = () => {
   };
 
   const canCancel = (appt) => {
-    // Always allow patients to cancel their own appointments
-    // This ensures the buttons are visible
     return true;
   };
 
@@ -121,7 +113,6 @@ const MyAppointments = () => {
   const handleCancel = async (id) => {
     setActionLoading(id);
     try {
-      // Update status to cancelled instead of deleting
       await apiRequest(`/appointments/${id}/status`, 'PUT', { status: 'cancelled' });
       await fetchAppointments();
     } catch (err) {
@@ -168,7 +159,7 @@ const MyAppointments = () => {
 
   if (!appointments.length) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-20 pb-12 px-4">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-medical-blue/10 hover:shadow-xl transition-all duration-300">
           <div className="w-16 h-16 bg-medical-blue/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <Calendar className="w-8 h-8 text-medical-blue" />
@@ -221,7 +212,12 @@ const MyAppointments = () => {
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-gray-500" />
               <span className="text-gray-700">
-                {user?.role === 'patient' ? `Dr. ${appt.doctor?.name || 'Unknown'}` : appt.patient?.name || 'Unknown'}
+                {user?.role === 'patient' ? 
+                  `Dr. ${appt.doctor?.name || 'Unknown'}` : 
+                  user?.role === 'doctor' ? 
+                    `Patient: ${appt.patient?.name || 'Unknown'}` :
+                    `Dr. ${appt.doctor?.name || 'Unknown'} - Patient: ${appt.patient?.name || 'Unknown'}`
+                }
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -275,9 +271,13 @@ const MyAppointments = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-20 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-8"><span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">My Appointments</span></h1>
+        <h1 className="text-3xl font-bold text-center mb-8 mt-4">
+          <span className="bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">
+            My Appointments
+          </span>
+        </h1>
         
 
       
@@ -316,9 +316,16 @@ const MyAppointments = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-sky-100">Doctor</div>
+                  <div className="text-sm text-sky-100">
+                    {user?.role === 'patient' ? 'Doctor' : user?.role === 'doctor' ? 'Patient' : 'Participants'}
+                  </div>
                   <div className="font-semibold">
-                    {user?.role === 'patient' ? `Dr. ${sortedUpcoming[0].doctor?.name || 'Unknown'}` : sortedUpcoming[0].patient?.name || 'Unknown'}
+                    {user?.role === 'patient' ? 
+                      `Dr. ${sortedUpcoming[0].doctor?.name || 'Unknown'}` : 
+                      user?.role === 'doctor' ? 
+                        `${sortedUpcoming[0].patient?.name || 'Unknown'}` :
+                        `Dr. ${sortedUpcoming[0].doctor?.name || 'Unknown'} - ${sortedUpcoming[0].patient?.name || 'Unknown'}`
+                    }
                   </div>
                 </div>
                 <div>

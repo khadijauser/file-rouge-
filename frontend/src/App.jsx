@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -12,12 +12,37 @@ import Gallery from './pages/Gallery';
 import BookAppointment from './pages/BookAppointment';
 import MyAppointments from './pages/MyAppointments';
 import EditAppointment from './pages/EditAppointment';
+import Unauthorized from './pages/Unauthorized';
 import PatientDashboard from './pages/dashboards/PatientDashboard';
 import DoctorDashboard from './pages/dashboards/DoctorDashboard';
 import AdminDashboard from './pages/dashboards/AdminDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import { useEffect } from 'react';
 
 function App() {
+  useEffect(() => {
+    const handleUnhandledRejection = (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      
+      if (event.reason?.status === 403) {
+        console.warn('Permission denied - this may be expected behavior');
+        event.preventDefault();
+        return;
+      }
+      
+      const errorMessage = event.reason?.message || 'An unexpected error occurred';
+      toast.error(errorMessage);
+      
+      event.preventDefault();
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -29,11 +54,18 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/services" element={<Services />} />
             <Route path="/gallery" element={<Gallery />} />
-            <Route path="/book-appointment" element={<BookAppointment />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            <Route path="/book-appointment" element={
+              <ProtectedRoute>
+                <BookAppointment />
+              </ProtectedRoute>
+            } />
+            
             <Route 
               path="/edit-appointment/:id" 
               element={
-                <ProtectedRoute role="patient">
+                <ProtectedRoute>
                   <EditAppointment />
                 </ProtectedRoute>
               } 
@@ -41,7 +73,7 @@ function App() {
             <Route 
               path="/my-appointments" 
               element={
-                <ProtectedRoute role="patient">
+                <ProtectedRoute>
                   <MyAppointments />
                 </ProtectedRoute>
               } 

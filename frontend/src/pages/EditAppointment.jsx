@@ -37,8 +37,12 @@ const EditAppointment = () => {
         
         const appt = appointmentRes.appointment;
         
-        if (user.role === 'patient' && appt.patient._id.toString() !== user.id.toString()) {
-          throw new Error('You can only edit your own appointments');
+        if (user?.role === 'patient' && appt.patient?._id && user?._id) {
+          if (appt.patient._id.toString() !== user._id.toString()) {
+            throw new Error('You can only edit your own appointments');
+          }
+        } else if (!user?._id) {
+          throw new Error('User authentication required');
         }
         
         setOriginalAppointment(appt);
@@ -59,7 +63,7 @@ const EditAppointment = () => {
       }
     };
     
-    if (id) {
+    if (id && user) {
       fetchData();
     }
   }, [id, user]);
@@ -133,7 +137,7 @@ const EditAppointment = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-20 pb-12 px-4">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-medical-blue/10 hover:shadow-xl transition-all duration-300">
           <h2 className="text-2xl font-bold mb-4 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">Please log in</h2>
           <p className="text-gray-600 mb-6">You need to be logged in to edit appointments.</p>
@@ -154,7 +158,7 @@ const EditAppointment = () => {
    
   if (error && !originalAppointment) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-20 pb-12 px-4">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center border border-medical-blue/10 hover:shadow-xl transition-all duration-300">
           <h2 className="text-2xl font-bold mb-4 text-red-600">Error</h2>
           <p className="text-gray-600 mb-6">{error}</p>
@@ -170,7 +174,7 @@ const EditAppointment = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 pt-20 pb-12 px-4">
       <div className="max-w-2xl mx-auto">
         <button
           onClick={() => navigate('/my-appointments')}

@@ -3,12 +3,9 @@ import { useAuth } from '../../context/AuthContext';
 import { toast } from 'react-toastify';
 import { apiRequest } from '../../api';
 import { 
-  Users, 
-  Calendar, 
-  Shield,
-  Edit, Trash2, Plus, Search,
-  TrendingUp, BarChart3, FileText,
-  UserPlus, Eye, EyeOff, Settings, Download } from 'lucide-react';
+  Users, Calendar, Shield, Edit, Trash2, Plus, Search,
+  BarChart3, FileText, UserPlus, Eye, EyeOff, Settings, Download 
+} from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -20,39 +17,106 @@ const AdminDashboard = () => {
   
   const [services, setServices] = useState([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
-  const [serviceError, setServiceError] = useState(null);
   
-  useEffect(() => {
-    const fetchServices = async () => {
-      setIsLoadingServices(true);
-      setServiceError(null);
-      try {
-        const data = await apiRequest('/services');
-        const formattedServices = data.map(service => ({
-          id: service._id,
-          title: service.title,
-          category: service.category,
-          description: service.description,
-          image: service.image
-        }));
-        setServices(formattedServices);
-      } catch (error) {
-        console.error('Error fetching services:', error);
-        setServiceError('Failed to load services. Please try again later.');
-        toast.error('Failed to load services');
-      } finally {
-        setIsLoadingServices(false);
+  const resetUserForm = () => {
+    setUserForm({ name: '', email: '', password: '', role: 'patient', phone: '' });
+    setEditingUser(null);
+    setShowUserForm(false);
+  };
+
+  const getServiceId = (service) => service._id || service.id;
+
+  const updateServiceState = (action, serviceData) => {
+    switch (action) {
+      case 'add':
+        setServices(prev => [...prev, serviceData]);
+        break;
+      case 'update':
+        setServices(prev => prev.map(s => 
+          (s._id === serviceData.id || s.id === serviceData.id) ? { ...s, ...serviceData } : s
+        ));
+        break;
+      case 'delete':
+        setServices(prev => prev.filter(s => s._id !== serviceData.id && s.id !== serviceData.id));
+        break;
+      case 'set':
+        setServices(Array.isArray(serviceData) ? serviceData : []);
+        break;
+      default:
+        break;
+    }
+  };
+
+  const fetchServices = async () => {
+    setIsLoadingServices(true);
+    try {
+      const data = await apiRequest('/services');
+      updateServiceState('set', Array.isArray(data) ? data : (data.services || []));
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      toast.error('Failed to load services');
+    } finally {
+      setIsLoadingServices(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      if (user?.role !== 'admin') {
+        console.warn('Unauthorized access attempt to fetch users');
+        return;
       }
-    };
-    
-    fetchServices();
-  }, []);
-  
+      
+      const response = await apiRequest('/users/all');
+      setUsers(response.users || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      if (user?.role !== 'admin') {
+        console.warn('Unauthorized access attempt to fetch dashboard data');
+        return;
+      }
+      
+      const [usersResponse, appointmentsResponse] = await Promise.all([
+        apiRequest('/users/all'),
+        apiRequest('/appointments')
+      ]);
+      const totalUsers = usersResponse.users.length;
+      const totalAppointments = appointmentsResponse.appointments.length;
+      const activeDoctors = usersResponse.users.filter(user => user.role === 'doctor').length;
+      
+      setStats([
+        { label: 'Total Users', value: totalUsers.toString(), color: 'blue', icon: Users },
+        { label: 'Total Appointments', value: totalAppointments.toString(), color: 'green', icon: Calendar },
+        { label: 'Active Doctors', value: activeDoctors.toString(), color: 'orange', icon: Shield }
+      ]);
+    } catch (error) {
+      toast.error('Failed to load dashboard data');
+      console.error('Dashboard data fetch error:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      fetchServices();
+      fetchUsers();
+      fetchDashboardData();
+      fetchRecentActivities();
+    }
+  }, [user]);
 
   const handleEditService = (serviceId) => {
-    const serviceToEdit = services.find(service => service.id === serviceId);
+    const serviceToEdit = services.find(service => getServiceId(service) === serviceId);
     if (serviceToEdit) {
-      setEditingService({...serviceToEdit}); 
+      setEditingService({...serviceToEdit, id: getServiceId(serviceToEdit)}); 
       setShowServiceForm(true);
       toast.info('Edit service details');
     }
@@ -62,7 +126,7 @@ const AdminDashboard = () => {
     if (window.confirm('Are you sure you want to delete this service?')) {
       try {
         await apiRequest(`/services/${serviceId}`, 'DELETE');
-        setServices(services.filter(service => service.id !== serviceId));
+        updateServiceState('delete', { id: serviceId, _id: serviceId });
         toast.success('Service deleted successfully');
       } catch (error) {
         console.error('Error deleting service:', error);
@@ -72,15 +136,8 @@ const AdminDashboard = () => {
   };
 
   const handleAddUser = () => {
+    resetUserForm();
     setShowUserForm(true);
-    setEditingUser(null);
-    setUserForm({
-      name: '',
-      email: '',
-      password: '',
-      role: 'patient',
-      phone: ''
-    });
     toast.info('Adding a new user');
   };
 
@@ -125,8 +182,7 @@ const AdminDashboard = () => {
         const response = await apiRequest(`/users/${editingUser._id}`, 'PUT', updatedUser);
         if (response) {
           toast.success('User updated successfully');
-          setShowUserForm(false);
-          setEditingUser(null);
+          resetUserForm();
           fetchUsers();
         } else {
           toast.error('Failed to update user: No response from server');
@@ -135,8 +191,7 @@ const AdminDashboard = () => {
         const response = await apiRequest('/users/register', 'POST', userForm);
         if (response) {
           toast.success('User added successfully');
-          setShowUserForm(false);
-          setEditingUser(null);
+          resetUserForm();
           fetchUsers();
         } else {
           toast.error('Failed to add user: No response from server');
@@ -149,288 +204,144 @@ const AdminDashboard = () => {
   };
 
   const handleUserFormCancel = () => {
-    setShowUserForm(false);
-    setEditingUser(null);
+    resetUserForm();
     toast.info('User form cancelled');
   };
 
   const handleAddService = () => {
+    setEditingService({ id: 'new', title: '', category: 'aesthetic', description: '', image: null });
     setShowServiceForm(true);
-    
-    const newService = {
-      id: 'new', 
-      title: '',
-      category: 'aesthetic',
-      description: '',
-      image: null,
-      imageFile: null
-    };
-    
-    setEditingService(newService);
     toast.info('Please fill in the service details');
   };
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'inactive':
-        return 'bg-gray-100 text-gray-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'suspended':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   const getRoleColor = (role) => {
-    switch (role.toLowerCase()) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-800';
-      case 'doctor':
-        return 'bg-blue-100 text-blue-800';
-      case 'patient':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    const colors = {
+      admin: 'bg-purple-100 text-purple-800',
+      doctor: 'bg-blue-100 text-blue-800',
+      patient: 'bg-green-100 text-green-800'
+    };
+    return colors[role?.toLowerCase()] || 'bg-gray-100 text-gray-800';
   };
 
   const [stats, setStats] = useState([
-    { 
-      label: 'Total Users', 
-      value: '0', 
-      change: 'Loading...', 
-      color: 'blue',
-      icon: Users
-    },
-    { 
-      label: 'Total Appointments', 
-      value: '0', 
-      change: 'Loading...', 
-      color: 'green',
-      icon: Calendar
-    },
-    { 
-      label: 'Active Doctors', 
-      value: '0', 
-      change: 'Loading...', 
-      color: 'orange',
-      icon: Shield
-    }
+    { label: 'Total Users', value: '0', color: 'blue', icon: Users },
+    { label: 'Total Appointments', value: '0', color: 'green', icon: Calendar },
+    { label: 'Active Doctors', value: '0', color: 'orange', icon: Shield }
   ]);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const usersResponse = await apiRequest('/users');
-        const totalUsers = usersResponse.users.length;
-        const appointmentsResponse = await apiRequest('/appointments');
-        const totalAppointments = appointmentsResponse.appointments.length;
-        
-        const activeDoctors = usersResponse.users.filter(user => 
-          user.role === 'doctor'
-        ).length;
-        
-       
-        setStats([
-          { 
-            label: 'Total Users', 
-            value: totalUsers.toString(), 
-            change: `${Math.round(totalUsers * 0.15)}% increase from last month`, 
-            color: 'blue',
-            icon: Users
-          },
-          { 
-            label: 'Total Appointments', 
-            value: totalAppointments.toString(), 
-            change: `${Math.round(totalAppointments * 0.08)}% increase from last month`, 
-            color: 'green',
-            icon: Calendar
-          },
-          { 
-            label: 'Active Doctors', 
-            value: activeDoctors.toString(), 
-            change: `${Math.round(activeDoctors * 0.05)}% increase from last month`, 
-            color: 'orange',
-            icon: Shield
-          }
-        ]);
-      } catch (error) {
-        toast.error('Failed to load dashboard data');
-        console.error('Dashboard data fetch error:', error);
-      }
-    };
-    
-    fetchDashboardData();
-  }, []);
-  
+  const [recentActivities, setRecentActivities] = useState([{
+    id: 'loading', type: 'loading', description: 'Loading recent activities...',
+    timestamp: '', icon: Calendar, color: 'gray'
+  }]);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [userForm, setUserForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'patient',
-    phone: ''
+    name: '', email: '', password: '', role: 'patient', phone: ''
   });
+
+
   
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
+
+
+
+  
+  const fetchRecentActivities = async () => {
     try {
-      const response = await apiRequest('/users');
-      if (response && response.users) {
-        setUsers(response.users);
+      if (user?.role !== 'admin') {
+        console.warn('Unauthorized access attempt to fetch recent activities');
+        return;
       }
+      
+      const [appointmentsResponse, usersResponse, galleryResponse] = await Promise.all([
+        apiRequest('/appointments'),
+        apiRequest('/users/all'),
+        apiRequest('/gallery')
+      ]);
+      
+      const recentUsers = [...usersResponse.users]
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, 2);
+      const recentAppointments = [...appointmentsResponse.appointments]
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, 2);
+      const recentGallery = [...galleryResponse.galleryItems]
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+        .slice(0, 2);
+      
+      const formattedActivities = [
+        ...recentUsers.map((user, index) => ({
+          id: `user-${user._id || index}`,
+          type: 'user_registration',
+          description: `New ${user.role} registered: ${user.name}`,
+          timestamp: formatTimeAgo(user.createdAt),
+          icon: UserPlus,
+          color: user.role === 'doctor' ? 'purple' : 'green'
+        })),
+        ...recentAppointments.map((appointment, index) => ({
+          id: `appointment-${appointment._id || index}`,
+          type: 'appointment_booked',
+          description: `Appointment booked: ${appointment.patient?.name || 'Unknown Patient'} with ${appointment.doctor?.name || 'Unknown Doctor'}`,
+          timestamp: formatTimeAgo(appointment.createdAt),
+          icon: Calendar,
+          color: 'blue'
+        })),
+        ...recentGallery.map((item, index) => ({
+          id: `gallery-${item._id || index}`,
+          type: 'gallery_upload',
+          description: `New before/after images added by ${item.doctor?.name || 'Unknown Doctor'}`,
+          timestamp: formatTimeAgo(item.createdAt),
+          icon: FileText,
+          color: 'orange'
+        }))
+      ];
+      
+      const sortedActivities = formattedActivities
+        .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+        .slice(0, 5);
+      
+      setRecentActivities(sortedActivities.length > 0 ? sortedActivities : [{
+        id: 'no-activity', type: 'no_activity', description: 'No recent activities found',
+        timestamp: '', icon: Calendar, color: 'gray'
+      }]);
     } catch (error) {
-      console.error('Error fetching users:', error);
-      toast.error('Failed to load users data');
-    } finally {
-      setLoadingUsers(false);
+      console.error('Error fetching recent activities:', error);
+      setRecentActivities([{
+        id: 'error', type: 'error', description: 'Failed to load recent activities',
+        timestamp: '', icon: Calendar, color: 'red'
+      }]);
     }
   };
-  
-  useEffect(() => {
-    fetchUsers();
-  }, []);
 
-  const [recentActivities, setRecentActivities] = useState([
-    {
-      id: 'loading',
-      type: 'loading',
-      description: 'Loading recent activities...',
-      timestamp: '',
-      icon: Calendar,
-      color: 'gray'
-    }
-  ]);
-  
-  useEffect(() => {
-    const fetchRecentActivities = async () => {
-      try {
-        const appointmentsResponse = await apiRequest('/appointments');
-        const appointments = appointmentsResponse.appointments || [];
-        
-        const usersResponse = await apiRequest('/users');
-        const users = usersResponse.users || [];
-        
-        const galleryResponse = await apiRequest('/gallery');
-        const galleryItems = galleryResponse.galleryItems || [];
-        
-        const recentUsers = [...users]
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-          .slice(0, 2);
-          
-        const recentAppointments = [...appointments]
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-          .slice(0, 2);
-          
-        const recentGallery = [...galleryItems]
-          .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-          .slice(0, 2);
-        
-        const formattedActivities = [
-          ...recentUsers.map((user, index) => ({
-            id: `user-${user._id || index}`,
-            type: 'user_registration',
-            description: `New ${user.role} registered: ${user.name}`,
-            timestamp: formatTimeAgo(user.createdAt),
-            icon: UserPlus,
-            color: user.role === 'doctor' ? 'purple' : 'green'
-          })),
-          
-          ...recentAppointments.map((appointment, index) => {
-            const doctorName = appointment.doctor?.name || 'Unknown Doctor';
-            const patientName = appointment.patient?.name || 'Unknown Patient';
-            return {
-              id: `appointment-${appointment._id || index}`,
-              type: 'appointment_booked',
-              description: `Appointment booked: ${patientName} with ${doctorName}`,
-              timestamp: formatTimeAgo(appointment.createdAt),
-              icon: Calendar,
-              color: 'blue'
-            };
-          }),
-          
-          ...recentGallery.map((item, index) => {
-            const doctorName = item.doctor?.name || 'Unknown Doctor';
-            return {
-              id: `gallery-${item._id || index}`,
-              type: 'gallery_upload',
-              description: `New before/after images added by ${doctorName}`,
-              timestamp: formatTimeAgo(item.createdAt),
-              icon: FileText,
-              color: 'orange'
-            };
-          })
-        ];
-        
-        const sortedActivities = formattedActivities
-          .sort((a, b) => {
-            return b.timestamp.localeCompare(a.timestamp);
-          })
-          .slice(0, 5); 
-        
-        setRecentActivities(sortedActivities.length > 0 ? sortedActivities : [{
-          id: 'no-activity',
-          type: 'no_activity',
-          description: 'No recent activities found',
-          timestamp: '',
-          icon: Calendar,
-          color: 'gray'
-        }]);
-      } catch (error) {
-        console.error('Error fetching recent activities:', error);
-        setRecentActivities([{
-          id: 'error',
-          type: 'error',
-          description: 'Failed to load recent activities',
-          timestamp: '',
-          icon: Calendar,
-          color: 'red'
-        }]);
-      }
-    };
-    
-    fetchRecentActivities();
-  }, []);
+
   
   const formatTimeAgo = (timestamp) => {
     if (!timestamp) return 'Recently';
-    
     const now = new Date();
     const date = new Date(timestamp);
     const diffMs = now - date;
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMins = Math.floor(diffMs / (1000 * 60));
     
-    if (diffDays > 0) {
-      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    } else if (diffHours > 0) {
-      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    } else if (diffMins > 0) {
-      return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
-    } else {
-      return 'Just now';
-    }
+    if (diffDays > 0) return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    if (diffHours > 0) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    if (diffMins > 0) return diffMins === 1 ? '1 minute ago' : `${diffMins} minutes ago`;
+    return 'Just now';
   };
   
 
   const getStatColor = (color) => {
-    switch (color) {
-      case 'blue': return 'bg-blue-100 text-blue-600';
-      case 'green': return 'bg-green-100 text-green-600';
-      case 'purple': return 'bg-purple-100 text-purple-600';
-      case 'orange': return 'bg-orange-100 text-orange-600';
-      default: return 'bg-gray-100 text-gray-600';
-    }
+    const colors = {
+      blue: 'bg-blue-100 text-blue-600',
+      green: 'bg-green-100 text-green-600', 
+      purple: 'bg-purple-100 text-purple-600',
+      orange: 'bg-orange-100 text-orange-600'
+    };
+    return colors[color] || 'bg-gray-100 text-gray-600';
   };
 
 
@@ -464,10 +375,6 @@ const AdminDashboard = () => {
                   <div className="flex-1">
                     <p className="text-lg font-medium text-gray-700">{stat.label}</p>
                     <p className="text-4xl font-bold bg-gradient-to-r from-pink-500 to-medical-blue bg-clip-text text-transparent mt-2">{stat.value}</p>
-                    <div className="flex items-center mt-3">
-                      <TrendingUp className="w-5 h-5 text-medical-pink mr-2" />
-                      <span className="text-sm text-medical-pink font-medium">{stat.change}</span>
-                    </div>
                   </div>
                   <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-gradient-to-r from-pink-400/20 to-medical-blue/20 text-medical-pink">
                     <IconComponent className="w-8 h-8" />
@@ -484,8 +391,7 @@ const AdminDashboard = () => {
               {[
                 { id: 'overview', name: 'Overview', icon: BarChart3 },
                 { id: 'users', name: 'User Management', icon: Users },
-                { id: 'services', name: 'Services', icon: Settings },
-                { id: 'reports', name: 'Reports', icon: FileText }
+                { id: 'services', name: 'Services', icon: Settings }
               ].map((tab) => {
                 const IconComponent = tab.icon;
                 return (
@@ -507,52 +413,7 @@ const AdminDashboard = () => {
           </div>
 
           <div className="p-6">
-            {activeTab === 'reports' && (
-              <div className="space-y-6">
-                <h2 className="text-xl font-bold text-gray-900">Analytics & Reports</h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Appointments by Status</h3>
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="text-center">
-                        <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500">Chart will be displayed when appointments are available</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-            
-                  <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">User Growth</h3>
-                    <div className="h-64 flex items-center justify-center">
-                      <div className="text-center">
-                        <TrendingUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500">Chart will be displayed when more user data is available</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">System Statistics</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Total Services</p>
-                      <p className="text-2xl font-bold text-gray-900">{services.length}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Active Doctors</p>
-                      <p className="text-2xl font-bold text-gray-900">{users.filter(user => user.role === 'doctor').length}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <p className="text-sm text-gray-500">Total Patients</p>
-                      <p className="text-2xl font-bold text-gray-900">{users.filter(user => user.role === 'patient').length}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+
             
             {activeTab === 'overview' && (
               <div className="space-y-6">
@@ -579,7 +440,7 @@ const AdminDashboard = () => {
 
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-3 w-full">
+                    <div className="grid grid-cols-3 gap-3 w-full">
                       <button 
                         onClick={() => {
                           setActiveTab('users');
@@ -605,14 +466,19 @@ const AdminDashboard = () => {
                       <button 
                         onClick={async () => {
                           try {
-                            const usersResponse = await apiRequest('/users');
+                            if (user?.role !== 'admin') {
+                              toast.error('Access denied. Admin privileges required.');
+                              return;
+                            }
+                            
+                            const usersResponse = await apiRequest('/users/all');
                             const appointmentsResponse = await apiRequest('/appointments');
                             
                             const exportData = {
-                              users: usersResponse.users,
-                              appointments: appointmentsResponse.appointments,
+                              users: usersResponse.users || [],
+                              appointments: appointmentsResponse.appointments || [],
                               exportDate: new Date().toISOString(),
-                              exportedBy: user?.name
+                              exportedBy: user?.name || 'Admin'
                             };
                             
                             const dataStr = JSON.stringify(exportData, null, 2);
@@ -637,17 +503,7 @@ const AdminDashboard = () => {
                         <p className="font-medium text-gray-900">Export Data</p>
                         <p className="text-sm text-gray-600">Download reports</p>
                       </button>
-                      <button 
-                        onClick={() => {
-                          setActiveTab('reports');
-                          toast.info('Switched to Reports');
-                        }}
-                        className="p-4 border border-gray-200 rounded-lg hover:border-sky-500 hover:bg-sky-50 transition-colors text-left"
-                      >
-                        <Settings className="w-6 h-6 text-sky-600 mb-2" />
-                        <p className="font-medium text-gray-900">View Reports</p>
-                        <p className="text-sm text-gray-600">Analytics & statistics</p>
-                      </button>
+
                     </div>
                   </div>
                 </div>
@@ -955,25 +811,18 @@ const AdminDashboard = () => {
 
                               if (editingService.id === 'new') {
                                 const newService = await apiRequest('/services', 'POST', payload);
-                                setServices([...services, {
+                                updateServiceState('add', {
+                                  _id: newService._id,
                                   id: newService._id,
-                                  title: newService.title,
-                                  category: newService.category,
-                                  description: newService.description,
-                                  image: newService.image
-                                }]);
+                                  ...payload
+                                });
                                 toast.success('Service added successfully');
                               } else {
                                 const updatedService = await apiRequest(`/services/${editingService.id}`, 'PUT', payload);
-                                setServices(services.map(s => 
-                                  s.id === editingService.id ? {
-                                    id: updatedService._id,
-                                    title: updatedService.title,
-                                    category: updatedService.category,
-                                    description: updatedService.description,
-                                    image: updatedService.image
-                                  } : s
-                                ));
+                                updateServiceState('update', {
+                                  id: editingService.id,
+                                  ...payload
+                                });
                                 toast.success('Service updated successfully');
                               }
                             } catch (error) {
@@ -994,113 +843,56 @@ const AdminDashboard = () => {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {services.map((service) => (
-                    <div key={service.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-4">
-                        <h4 className="text-lg font-semibold text-gray-900">{service.title}</h4>
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {service.category}
-                        </span>
-                      </div>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex flex-col">
-                          <span className="text-gray-600 mb-1">Description:</span>
-                          <p className="text-gray-900">{service.description}</p>
+                  {services.map((service) => {
+                    const serviceId = getServiceId(service);
+                    return (
+                      <div key={serviceId} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-4">
+                          <h4 className="text-lg font-semibold text-gray-900">{service.title}</h4>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {service.category}
+                          </span>
                         </div>
-                        {service.image && (
-                          <div className="mt-3">
-                            <img 
-                              src={service.image} 
-                              alt={service.title} 
-                              className="w-full h-32 object-cover rounded-md" 
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = 'https://via.placeholder.com/300x150?text=Image+Not+Found';
-                              }}
-                            />
+                        <div className="space-y-2 mb-4">
+                          <div className="flex flex-col">
+                            <span className="text-gray-600 mb-1">Description:</span>
+                            <p className="text-gray-900">{service.description}</p>
                           </div>
-                        )}
+                          {service.image && (
+                            <div className="mt-3">
+                              <img 
+                                src={service.image} 
+                                alt={service.title} 
+                                className="w-full h-32 object-cover rounded-md" 
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = 'https://via.placeholder.com/300x150?text=Image+Not+Found';
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <button 
+                            className="flex-1 text-sky-600 border border-sky-600 px-3 py-2 rounded-lg hover:bg-sky-50 transition-colors text-sm"
+                            onClick={() => handleEditService(serviceId)}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            className="flex-1 text-red-600 border border-red-600 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                            onClick={() => handleDeleteService(serviceId)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <button 
-                          className="flex-1 text-sky-600 border border-sky-600 px-3 py-2 rounded-lg hover:bg-sky-50 transition-colors text-sm"
-                          onClick={() => handleEditService(service.id)}
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          className="flex-1 text-red-600 border border-red-600 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm"
-                          onClick={() => handleDeleteService(service.id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            {activeTab === 'reports' && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-6">Analytics & Reports</h3>
-                
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-gray-50 p-6 rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-4">Monthly Revenue Trend</h4>
-                    <div className="h-48 flex items-end justify-between space-x-2">
-                      {[65, 78, 82, 95, 88, 92, 85, 90, 87, 94, 91, 96].map((height, index) => (
-                        <div key={index} className="bg-sky-500 rounded-t" style={{height: `${height}%`, width: '8%'}}></div>
-                      ))}
-                    </div>
-                    <div className="flex justify-between text-sm text-gray-600 mt-2">
-                      <span>Jan</span>
-                      <span>Dec</span>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-6 rounded-lg">
-                    <h4 className="font-semibold text-gray-900 mb-4">Service Popularity</h4>
-                    <div className="space-y-3">
-                      {[
-                        { name: 'Botox Treatment', percentage: 85 },
-                        { name: 'Teeth Whitening', percentage: 70 },
-                        { name: 'Dermal Fillers', percentage: 65 },
-                        { name: 'Dental Implants', percentage: 45 }
-                      ].map((service, index) => (
-                        <div key={index}>
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-700">{service.name}</span>
-                            <span className="text-gray-600">{service.percentage}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-sky-500 h-2 rounded-full" 
-                              style={{width: `${service.percentage}%`}}
-                            ></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex flex-wrap gap-4">
-                  <button className="bg-sky-600 text-white px-6 py-2 rounded-lg hover:bg-sky-700 transition-colors flex items-center">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export User Data
-                  </button>
-                  <button className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Appointments
-                  </button>
-                  <button className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center">
-                    <Download className="w-4 h-4 mr-2" />
-                    Financial Report
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

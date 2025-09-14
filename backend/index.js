@@ -11,8 +11,6 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ limit: '15mb', extended: true }));
 
-// app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
 const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/medibeauty';
 mongoose.connect(mongoUri)
 .then(() => console.log('MongoDB connected to:', mongoUri))
@@ -26,8 +24,6 @@ app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/gallery', require('./routes/galleryRoutes'));
 app.use('/api/services', require('./routes/serviceRoutes'));
-
-
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
