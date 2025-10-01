@@ -13,6 +13,7 @@ import BookAppointment from './pages/BookAppointment';
 import MyAppointments from './pages/MyAppointments';
 import EditAppointment from './pages/EditAppointment';
 import Unauthorized from './pages/Unauthorized';
+import Profile from './pages/Profile';
 import PatientDashboard from './pages/dashboards/PatientDashboard';
 import DoctorDashboard from './pages/dashboards/DoctorDashboard';
 import AdminDashboard from './pages/dashboards/AdminDashboard';
@@ -46,7 +47,7 @@ function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div className="min-h-screen bg-medical-white">
+        <div className="h-screen overflow-x-hidden bg-medical-white">
           <Navbar />
           <Routes>
             <Route path="/" element={<Home />} />
@@ -55,6 +56,12 @@ function App() {
             <Route path="/services" element={<Services />} />
             <Route path="/gallery" element={<Gallery />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
             
             <Route path="/book-appointment" element={
               <ProtectedRoute>

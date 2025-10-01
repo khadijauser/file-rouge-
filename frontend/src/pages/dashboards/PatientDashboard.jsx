@@ -22,10 +22,6 @@ const PatientDashboard = () => {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
 
-
-
-
-
   useEffect(() => {
     const fetchAppointments = async () => {
       try {
@@ -98,7 +94,7 @@ const PatientDashboard = () => {
     setProfileSuccess('');
     
     try {
-      await apiRequest('/users/me', 'PUT', profileForm);
+      await apiRequest('/users/profile', 'PUT', profileForm);
       await refreshUser();
       setProfileSuccess('Profile updated successfully!');
       setEditingProfile(false);

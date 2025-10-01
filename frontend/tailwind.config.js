@@ -10,5 +10,21 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addBase }) {
+      addBase({
+        'html, body': {
+          'overflow-x': 'hidden',
+          'overscroll-behavior': 'none',
+          'height': '100%',
+          'touch-action': 'manipulation',
+        },
+        '#root': {
+          'height': '100%',
+          'overflow-x': 'hidden',
+          'overscroll-behavior': 'none',
+        }
+      })
+    }
+  ],
 };

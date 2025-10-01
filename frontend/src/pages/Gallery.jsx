@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Filter, X } from 'lucide-react';
+import { Search, Filter, X, ArrowRight, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { galleryAPI, assetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -80,7 +80,7 @@ const Gallery = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="relative bg-cover bg-center h-[100vh]" style={{ backgroundImage: "url('https://i.pinimg.com/1200x/e3/49/0d/e3490dd1bf0fcbcfac8b3914be489103.jpg')" }}>
+      <div className="relative bg-cover bg-center h-screen" style={{ backgroundImage: "url('https://i.pinimg.com/1200x/e3/49/0d/e3490dd1bf0fcbcfac8b3914be489103.jpg')" }}>
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent"></div>
         <section className="relative py-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -109,9 +109,7 @@ Discover our collection of real before-and-after transformations, showcasing the
               className="bg-gradient-to-r from-medical-pink to-medical-blue text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg hover:shadow-medical-pink/20 transition-all duration-300 inline-flex items-center"
             >
               <span className="mr-2">Go to Gallery Management</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         )}
@@ -230,9 +228,7 @@ Discover our collection of real before-and-after transformations, showcasing the
               <div className="col-span-full text-center py-12 bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-lg">
                 <div className="max-w-md mx-auto">
                   <div className="text-white/40 mb-4">
-                    <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <Image className="w-16 h-16 mx-auto" />
                   </div>
                   <h3 className="text-lg font-medium text-white mb-2">
                     {galleryItems.length === 0 ? 'No Gallery Items Yet' : 'No Results Found'}

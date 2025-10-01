@@ -93,8 +93,8 @@ const Services = () => {
   const filteredServices = allServices.filter(service => isInSelectedCategory(selectedCategory, service.category));
   
   return (
-    <div>
-      <div className="relative bg-cover bg-center h-[100vh]" style={{ backgroundImage: "url('https://i.pinimg.com/736x/04/7c/94/047c9431d661625f3e084a087d3e98fb.jpg')" }}>
+    <div className="min-h-screen">
+      <div className="relative bg-cover bg-center h-screen" style={{ backgroundImage: "url('https://i.pinimg.com/736x/04/7c/94/047c9431d661625f3e084a087d3e98fb.jpg')" }}>
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent"></div>
         <div className="relative py-40 ">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 ">

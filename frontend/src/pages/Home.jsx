@@ -48,7 +48,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen">
-      <div className="relative bg-cover bg-center h-[100vh]" style={{ backgroundImage: "url('https://images.pexels.com/photos/3985318/pexels-photo-3985318.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1')" }}>
+      <div className="relative bg-cover bg-center h-screen" style={{ backgroundImage: "url('https://images.pexels.com/photos/3985318/pexels-photo-3985318.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1')" }}>
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-transparent"></div>
         <section className="relative py-20 z-10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -105,7 +105,7 @@ const Home = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {features.map((feature, index) => (
-                <div key={index} className="text-center p-6 rounded-xl bg-white shadow-md hover:shadow-lg hover:shadow-medical-blue/20 transition-all duration-300 border border-medical-blue/10 group">
+                <div key={index} className="text-center p-6 rounded-xl bg-white shadow-md hover:shadow-2xl hover:shadow-medical-blue/30 transition-all duration-300 border border-medical-blue/10 group relative hover:z-10 hover:-translate-y-2 cursor-pointer">
                   <div className="mb-4 flex justify-center">
                     <div className="p-3 rounded-full bg-medical-blue/20 group-hover:scale-110 transition-transform duration-300">
                       {feature.icon}
@@ -132,7 +132,7 @@ const Home = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {services.map((service, index) => (
-                <div key={index} className="bg-slate-100 rounded-xl overflow-hidden shadow-lg hover:shadow-xl hover:shadow-medical-pink/20 transition-all duration-300 border border-medical-blue/10 group">
+                <div key={index} className="bg-slate-100 rounded-xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-medical-pink/30 transition-all duration-300 border border-medical-blue/10 group relative hover:z-10 hover:-translate-y-3 cursor-pointer">
                   <div className="relative overflow-hidden">
                     <img 
                       src={service.image} 
@@ -162,19 +162,19 @@ const Home = () => {
       <section className="py-20 relative bg-cyan-100">
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-xl transition-all duration-300 hover:transform hover:scale-105">
+            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-2xl hover:shadow-medical-blue/30 transition-all duration-300 hover:transform hover:scale-105 relative hover:z-10 hover:-translate-y-2 cursor-pointer">
               <div className="text-4xl font-bold mb-2 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">1000+</div>
               <div className="text-gray-700 font-medium">Happy Patients</div>
             </div>
-            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-xl transition-all duration-300 hover:transform hover:scale-105">
+            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-2xl hover:shadow-medical-blue/30 transition-all duration-300 hover:transform hover:scale-105 relative hover:z-10 hover:-translate-y-2 cursor-pointer">
               <div className="text-4xl font-bold mb-2 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">50+</div>
               <div className="text-gray-700 font-medium">Expert Doctors</div>
             </div>
-            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-xl transition-all duration-300 hover:transform hover:scale-105">
+            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-2xl hover:shadow-medical-blue/30 transition-all duration-300 hover:transform hover:scale-105 relative hover:z-10 hover:-translate-y-2 cursor-pointer">
               <div className="text-4xl font-bold mb-2 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">15+</div>
               <div className="text-gray-700 font-medium">Years Experience</div>
             </div>
-            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-xl transition-all duration-300 hover:transform hover:scale-105">
+            <div className="p-6 rounded-xl bg-white shadow-md border border-medical-blue/10 hover:shadow-2xl hover:shadow-medical-blue/30 transition-all duration-300 hover:transform hover:scale-105 relative hover:z-10 hover:-translate-y-2 cursor-pointer">
               <div className="text-4xl font-bold mb-2 bg-gradient-to-r from-medical-pink to-medical-blue bg-clip-text text-transparent">98%</div>
               <div className="text-gray-700 font-medium">Satisfaction Rate</div>
             </div>

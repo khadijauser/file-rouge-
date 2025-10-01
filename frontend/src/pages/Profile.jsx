@@ -34,7 +34,7 @@ const Profile = () => {
     setError(null);
     setSuccess('');
     try {
-      await apiRequest('/users/me', 'PUT', form);
+      await apiRequest('/users/profile', 'PUT', form);
       await refreshUser();
       setSuccess('Profile updated!');
       setEditing(false);
@@ -46,7 +46,7 @@ const Profile = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-indigo-100 py-12 pt-24 px-4">
       <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
         <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">My Profile</h2>
         {error && (
